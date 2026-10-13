@@ -116,6 +116,7 @@ select{font:inherit;font-size:15px;padding:8px 10px;border-radius:6px;border:1px
 .zbox canvas{flex:none;width:110px;height:110px}
 .ztext{display:flex;flex-direction:column;gap:4px;min-width:0}
 .zlabel{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#a8a3c7}
+.zcat{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#d9b25a;opacity:var(--zfade,1)}
 #ztool-name{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.04em;color:#d9b25a}
 #ztool-text{margin:0;font-size:15.5px;line-height:1.5;color:#ecebf5;max-width:58ch}
 #ztool-name,#ztool-text{opacity:var(--zfade,1)}
@@ -181,7 +182,7 @@ function header(){
   if(owner) nav = `<div class="row viewnav"><button class="${view==='muziek'?'primary':''}" data-act="view-muziek">Muziek</button><button class="${view==='leden'?'primary':''}" data-act="view-leden">Leden</button></div>`;
   return `<header class="top"><div class="brand"><img class="logo" src="${LOGO}" alt="Logo Loge Ramses" width="84" height="84"><div class="brand-text"><span class="eyebrow">Loge Ramses · Velp</span><h1>Ritueelmuziek</h1>
   <p class="sub">Muziek die tijdens de rituelen is gespeeld, met het bijbehorende document.</p></div></div>
-  <div class="zbox"><canvas id="zodiac" aria-hidden="true"></canvas><div class="ztext" aria-live="off"><span class="zlabel" id="ztool-cat">Symbolen van de vrijmetselarij</span><strong id="ztool-name"></strong><p id="ztool-text"></p></div></div>
+  <div class="zbox"><canvas id="zodiac" aria-hidden="true"></canvas><div class="ztext" aria-live="off"><span class="zlabel">De symbolen van de vrijmetselarij</span><strong id="ztool-name"></strong><p id="ztool-text"></p></div></div>
   ${mode}${nav}</header>`;
 }
 function footer(){
@@ -635,7 +636,7 @@ sb.auth.onAuthStateChange((_e, s)=>{ setTimeout(()=>applySession(s), 0); });
     { c:G, n:'De winkelhaak als Groot Licht', m:'Richt de handelingen en het morele kompas op het aardse en menselijke vlak.', ...D.winkelhaak() },
     { c:G, n:'De passer als Groot Licht', m:'Richt de geest en het bewustzijn op het kosmische en spirituele vlak.', ...D.passer() },
 
-    { c:B, n:'De kolommen Jachin en Boaz', m:'Twee grote zuilen bij de ingang van de tempel. Boaz (links) staat voor kracht, Jachin (rechts) voor standvastigheid en oprichting. Samen symboliseren ze stabiliteit en dualiteit.',
+    { c:B, n:'De kolommen Jachin en Boaz', m:'Twee grote zuilen bij de ingang van de tempel. Jachin staat voor standvastigheid en oprichting, Boaz voor kracht. Samen symboliseren ze stabiliteit en dualiteit.',
       ...shape(...D.kolom(.14,.18,.2,.94), ...D.kolom(.68,.18,.2,.94)) },
     { c:B, n:'De drie kolommen', m:'Wijsheid, Kracht en Schoonheid dragen de loge symbolisch. Wijsheid ontwerpt, Kracht voert uit en Schoonheid siert het levenswerk.',
       ...shape(...D.kolom(.06,.16,.3,.94,false), ...D.kolom(.42,.16,.12,.94,false), ...D.kolom(.78,.16,.3,.94,false)) },
@@ -758,7 +759,7 @@ sb.auth.onAuthStateChange((_e, s)=>{ setTimeout(()=>applySession(s), 0); });
     });
     // Naam en betekenis als gewone tekst naast de tekening
     const nameEl = document.getElementById('ztool-name'), textEl = document.getElementById('ztool-text'), box = zc.closest('.zbox');
-    if(nameEl && nameEl.dataset.i !== String(idx)){ nameEl.textContent = z.n; textEl.textContent = z.m; nameEl.dataset.i = idx; const cat=document.getElementById('ztool-cat'); if(cat) cat.textContent = 'Symbolen van de vrijmetselarij · ' + z.c; }
+    if(nameEl && nameEl.dataset.i !== String(idx)){ nameEl.textContent = z.n; textEl.textContent = z.m; nameEl.dataset.i = idx; const cat=document.getElementById('ztool-cat'); if(cat) cat.textContent = z.c; }
     if(box){ const o = Math.max(0, Math.min(1, fade*Math.min(1, build*1.6))).toFixed(2); if(box.style.getPropertyValue('--zfade') !== o) box.style.setProperty('--zfade', o); }
     z2.globalAlpha = 1;
   }
