@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ritueelmuziek Loge Ramses</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{color-scheme:light}
+body{margin:0}
+[hidden]{display:none!important}
+a.btn{text-decoration:none;color:var(--ink)}
+/* Layout: smal register — kop met logenaam, tabbladen als register-ruggen, per ritueel één regel met speler en document. */
+:root{
+  --bg:#f5f4ef; --surface:#ffffff; --ink:#1b2340; --muted:#5d6380; --line:#d9d8e2;
+  --blue:#1f3a8a; --gold:#a47a1c; --gold-soft:#f1e7cf; --danger:#a3282c;
+  --display:"Cinzel","Trajan Pro",Georgia,serif;
+  --body:"Literata",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1426; --surface:#171e36; --ink:#e7e6f0; --muted:#a2a6c0; --line:#2c3556;
+  --blue:#8fa8ff; --gold:#d9b25a; --gold-soft:#2b2a2a; --danger:#ff8a8a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1426; --surface:#171e36; --ink:#e7e6f0; --muted:#a2a6c0; --line:#2c3556;
+  --blue:#8fa8ff; --gold:#d9b25a; --gold-soft:#2b2a2a; --danger:#ff8a8a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:28px 64px}
+header.top{display:flex;flex-direction:column;gap:4px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(28px,6vw,40px);letter-spacing:.06em;margin:0;text-wrap:balance;color:var(--ink)}
+.sub{color:var(--muted);margin:0;font-size:15px}
+.mode{align-self:flex-start;margin-top:8px;font-family:var(--mono);font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.mode.owner{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+nav.tabs{display:flex;gap:6px;overflow-x:auto;padding-block:18px 0;scrollbar-width:thin}
+.tab{flex:none;font-family:var(--display);font-size:14px;letter-spacing:.06em;padding:9px 14px;border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;background:transparent;color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink);border-color:var(--gold);box-shadow:inset 0 3px 0 var(--gold)}
+.tab.add{color:var(--blue);border-style:dashed}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:0 8px 8px 8px;padding:18px;display:flex;flex-direction:column;gap:16px}
+.panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.panel-head h2{font-family:var(--display);font-weight:500;letter-spacing:.05em;font-size:20px;margin:0;min-width:0;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:inherit;font-size:14px;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--blue)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.primary{background:var(--blue);border-color:var(--blue);color:var(--bg)}
+button.danger{color:var(--danger);border-color:var(--danger)}
+button.link{border:none;padding:4px 6px;color:var(--blue);background:transparent}
+button:disabled{opacity:.55;cursor:default}
+ul.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+li.item{display:flex;flex-direction:column;gap:10px;padding-block:16px;border-top:1px solid var(--line)}
+li.item:first-child{border-top:none;padding-top:4px}
+.item-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.item-head h3{margin:0;font-size:18px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.date{font-family:var(--mono);font-size:13px;color:var(--gold);font-variant-numeric:tabular-nums}
+.note{margin:0;color:var(--muted);font-size:15px;white-space:pre-wrap;max-width:65ch}
+audio{width:100%;max-width:100%}
+.files{display:flex;flex-wrap:wrap;gap:8px}
+.file{display:inline-flex;align-items:center;gap:8px;max-width:100%}
+.file .kind{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--gold-soft);color:var(--gold)}
+.file .name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:28ch}
+.empty{color:var(--muted);text-align:center;padding-block:28px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty strong{font-family:var(--display);letter-spacing:.05em;color:var(--ink);font-weight:500}
+form.edit{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px dashed var(--gold);border-radius:8px;background:var(--bg)}
+form.edit label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-family:var(--mono);color:var(--muted);letter-spacing:.03em}
+input[type=text],input[type=date],textarea{font:inherit;font-family:var(--body);font-size:15px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+input[type=file]{font-size:14px;color:var(--ink);max-width:100%}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+.hint{font-family:var(--body);font-size:13px;color:var(--muted)}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-radius:6px;background:var(--gold-soft);font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);z-index:5}
+footer{margin-top:28px;font-size:13px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:no-preference){.tab,button{transition:border-color .15s,background .15s}}
+.login{display:flex;flex-direction:column;gap:12px;max-width:360px;margin:0 auto;padding:18px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.login h2{font-family:var(--display);font-weight:500;letter-spacing:.05em;font-size:20px;margin:0}
+.login label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-family:var(--mono);color:var(--muted)}
+input[type=email],input[type=password]{font:inherit;font-size:15px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:100%;box-sizing:border-box}
+.err{color:var(--danger);font-size:14px;margin:0}
+.progress{font-family:var(--mono);font-size:13px;color:var(--gold)}
+footer button.link{font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"><p class="sub">Laden…</p></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ================================================================
+   INSTELLINGEN — vul hier je eigen Supabase-gegevens in
+   (Supabase → Project Settings → API)
+   ================================================================ */
+const SUPABASE_URL      = 'https://sbayrgancmjrnspmfnjv.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiYXlyZ2FuY21qcm5zcG1mbmp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDMzNDMsImV4cCI6MjEwNzQ3OTM0M30.8J2e_5qISsO7Oxvxg08A45WSIlPQFjQBNfKE_vzAM4w';
+const BUCKET = 'ritueel';
+/* ================================================================ */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let tabs = [], items = [], owner = false;
+let activeTab = null, editing = null, confirming = null, busy = false, progress = '', showLogin = false, loginError = '', loadError = '';
+try{ activeTab = (location.hash||'').slice(1) || localStorage.getItem('ramses-tab'); }catch(e){}
+const root = document.getElementById('root');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => { if(!d) return ''; const t=new Date(d+'T12:00:00'); return isNaN(t)?d:t.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}); };
+const ext = n => (String(n).split('.').pop()||'').toLowerCase();
+const publicUrl = (path, downloadName) => sb.storage.from(BUCKET).getPublicUrl(path, downloadName ? {download: downloadName} : undefined).data.publicUrl;
+
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; t.setAttribute('role','status'); document.body.appendChild(t); setTimeout(()=>t.remove(),4000); }
+function currentTab(){ let t=tabs.find(x=>x.id===activeTab); if(!t){ t=tabs[0]||null; activeTab=t?t.id:null; } return t; }
+const itemsOf = tabId => items.filter(i=>i.tab_id===tabId).sort((a,b)=>(b.ritual_date||'').localeCompare(a.ritual_date||'') || (b.created_at||'').localeCompare(a.created_at||''));
+
+async function load(){
+  const [t,i] = await Promise.all([
+    sb.from('tabs').select('*').order('position').order('created_at'),
+    sb.from('items').select('*')
+  ]);
+  if(t.error||i.error){ loadError='De gegevens konden niet worden geladen. Controleer de internetverbinding of de instellingen bovenaan het bestand.'; }
+  else { loadError=''; tabs=t.data; items=i.data; }
+  render();
+}
+
+function header(){
+  return `<header class="top"><span class="eyebrow">Loge Ramses · Velp</span><h1>Ritueelmuziek</h1>
+  <p class="sub">Muziek die tijdens de rituelen is gespeeld, met het bijbehorende document.</p>
+  <span class="mode ${owner?'owner':''}">${owner?'Beheer — jij kunt wijzigen':'Alleen bekijken en downloaden'}</span></header>`;
+}
+function footer(){
+  return `<footer>${owner
+    ? `Wijzigingen zijn direct zichtbaar voor iedereen met de link. <button class="link" data-act="logout">Uitloggen</button>`
+    : `Alleen de broeder van talent kan hier iets toevoegen of wijzigen. <button class="link" data-act="show-login">Beheer</button>`}</footer>`;
+}
+
+function render(){
+  let h = header();
+  if(showLogin && !owner){
+    h += `<form class="login" data-form="login" style="margin-top:24px"><h2>Inloggen beheer</h2>
+      <label>E-mailadres<input type="email" id="login-email" required autocomplete="username"></label>
+      <label>Wachtwoord<input type="password" id="login-pass" required autocomplete="current-password"></label>
+      ${loginError?`<p class="err">${esc(loginError)}</p>`:''}
+      <div class="row"><button class="primary" type="submit">Inloggen</button><button type="button" data-act="hide-login">Annuleren</button></div></form>`;
+    root.innerHTML = h; bind(); return;
+  }
+  if(loadError){ root.innerHTML = h + `<div class="empty"><strong>Niet geladen</strong><span>${esc(loadError)}</span><button data-act="reload">Opnieuw proberen</button></div>` + footer(); bind(); return; }
+
+  const tab = currentTab();
+  h += `<nav class="tabs" role="tablist">`;
+  tabs.forEach(t=>{ h+=`<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${!!tab&&t.id===tab.id}">${esc(t.name)}</button>`; });
+  if(owner) h+=`<button class="tab add" data-act="new-tab">+ Tabblad</button>`;
+  h += `</nav>`;
+
+  if(!tab){
+    h += `<section class="panel" style="border-radius:8px"><div class="empty">${ owner
+      ? `<strong>Nog geen tabbladen</strong><span>Maak een tabblad aan, bijvoorbeeld per graad of per ritueel, en voeg daarna muziek en documenten toe.</span>${tabNameForm('new')}`
+      : `<strong>Er is nog niets gedeeld</strong><span>Zodra de broeder van talent muziek toevoegt, verschijnt die hier.</span>`}</div></section>`;
+    root.innerHTML = h + footer(); bind(); return;
+  }
+
+  const list = itemsOf(tab.id);
+  h += `<section class="panel" role="tabpanel"><div class="panel-head">`;
+  if(owner && editing==='rename-tab') h += tabNameForm('rename', tab.name);
+  else {
+    h += `<h2>${esc(tab.name)}</h2>`;
+    if(owner) h += `<div class="row"><button class="link" data-act="rename-tab">Naam wijzigen</button><button class="link" data-act="ask-del-tab">Tabblad verwijderen</button><button class="primary" data-act="add-item">+ Muziek toevoegen</button></div>`;
+  }
+  h += `</div>`;
+  if(owner && editing==='new-tab') h += tabNameForm('new');
+  if(confirming==='tab') h += `<div class="confirm">Tabblad “${esc(tab.name)}” met ${list.length} ${list.length===1?'nummer':'nummers'} verwijderen? <button class="danger" data-act="del-tab">Verwijderen</button><button data-act="cancel">Annuleren</button></div>`;
+  if(owner && editing==='new-item') h += itemForm(null);
+
+  if(!list.length && editing!=='new-item'){
+    h += `<div class="empty"><strong>Dit tabblad is nog leeg</strong><span>${owner?'Voeg een muzieknummer toe met het bijbehorende Word- of PDF-document.':'Hier is nog niets geplaatst.'}</span>${owner?'<button class="primary" data-act="add-item">+ Muziek toevoegen</button>':''}</div>`;
+  }
+  h += `<ul class="items">`;
+  list.forEach(it=>{
+    if(owner && editing===it.id){ h += `<li class="item">${itemForm(it)}</li>`; return; }
+    h += `<li class="item"><div class="item-head"><h3>${esc(it.title)}</h3>${it.ritual_date?`<span class="date">${esc(fmtDate(it.ritual_date))}</span>`:''}</div>`;
+    if(it.note) h += `<p class="note">${esc(it.note)}</p>`;
+    if(it.audio_path) h += `<audio controls preload="none" src="${esc(publicUrl(it.audio_path))}"></audio>`;
+    h += `<div class="files">`;
+    if(it.audio_path) h += fileLink(it.audio_path, it.audio_name, 'Muziek');
+    if(it.doc_path) h += fileLink(it.doc_path, it.doc_name, ext(it.doc_name)==='pdf'?'PDF':'Word');
+    h += `</div>`;
+    if(owner){
+      if(confirming===it.id) h += `<div class="confirm">“${esc(it.title)}” verwijderen? <button class="danger" data-act="del-item" data-id="${it.id}">Verwijderen</button><button data-act="cancel">Annuleren</button></div>`;
+      else h += `<div class="row"><button class="link" data-act="edit-item" data-id="${it.id}">Bewerken</button><button class="link" data-act="ask-del-item" data-id="${it.id}">Verwijderen</button></div>`;
+    }
+    h += `</li>`;
+  });
+  h += `</ul></section>`;
+  root.innerHTML = h + footer();
+  bind();
+}
+function fileLink(path,name,kind){
+  return `<a class="btn file" href="${esc(publicUrl(path,name))}" download="${esc(name)}" title="Download ${esc(name)}"><span class="kind">${kind}</span><span class="name">${esc(name)}</span><span aria-hidden="true">↓</span></a>`;
+}
+function tabNameForm(mode,val){
+  return `<form class="edit" data-form="tab-${mode}" style="width:100%;box-sizing:border-box"><label>Naam van het tabblad<input type="text" id="tab-name" required maxlength="60" value="${esc(val||'')}" placeholder="bijv. Eerste graad"></label><div class="row"><button class="primary" type="submit">${mode==='new'?'Tabblad maken':'Opslaan'}</button>${(mode==='rename'||tabs.length)?'<button type="button" data-act="cancel">Annuleren</button>':''}</div></form>`;
+}
+function itemForm(it){
+  return `<form class="edit" data-form="item" data-id="${it?it.id:''}">
+  <div class="grid2"><label>Titel van het nummer<input type="text" id="it-title" required maxlength="140" value="${esc(it?it.title:'')}" placeholder="bijv. Air – J.S. Bach"></label>
+  <label>Datum ritueel<input type="date" id="it-date" value="${esc(it?it.ritual_date||'':'')}"></label></div>
+  <label>Toelichting (optioneel)<textarea id="it-note" rows="2" maxlength="600" placeholder="bijv. gespeeld bij de opening">${esc(it?it.note||'':'')}</textarea></label>
+  <label>Muziekbestand${it&&it.audio_name?` <span class="hint">huidig: ${esc(it.audio_name)}</span>`:''}<input type="file" id="it-audio" accept="audio/*,.mp3,.m4a,.wav,.ogg"></label>
+  <label>Document (Word of PDF)${it&&it.doc_name?` <span class="hint">huidig: ${esc(it.doc_name)}</span>`:''}<input type="file" id="it-doc" accept=".pdf,.doc,.docx"></label>
+  <span class="hint">Maximaal 50 MB per bestand.</span>
+  ${progress?`<span class="progress">${esc(progress)}</span>`:''}
+  <div class="row"><button class="primary" type="submit" ${busy?'disabled':''}>${busy?'Bezig…':(it?'Wijzigingen opslaan':'Toevoegen')}</button><button type="button" data-act="cancel" ${busy?'disabled':''}>Annuleren</button></div></form>`;
+}
+
+function bind(){
+  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ activeTab=b.dataset.tab; editing=null; confirming=null; try{localStorage.setItem('ramses-tab',activeTab)}catch(e){} render(); });
+  root.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>act(b.dataset.act,b.dataset));
+  root.querySelectorAll('form[data-form]').forEach(f=>f.onsubmit=e=>{ e.preventDefault(); submit(f); });
+  const first = root.querySelector('form input[type=text],form input[type=email]'); if(first && document.activeElement===document.body) first.focus();
+}
+
+async function act(a,d){
+  const tab=currentTab();
+  if(a==='show-login'){ showLogin=true; loginError=''; return render(); }
+  if(a==='hide-login'){ showLogin=false; return render(); }
+  if(a==='reload') return load();
+  if(a==='logout'){ await sb.auth.signOut(); return; }
+  if(!owner) return;
+  confirming=null;
+  if(a==='new-tab') editing='new-tab';
+  else if(a==='rename-tab') editing='rename-tab';
+  else if(a==='ask-del-tab'){ confirming='tab'; editing=null; }
+  else if(a==='del-tab'){
+    const paths=filePaths(itemsOf(tab.id));
+    const {error}=await sb.from('tabs').delete().eq('id',tab.id);
+    if(error) return toast('Verwijderen is niet gelukt.');
+    if(paths.length) sb.storage.from(BUCKET).remove(paths);
+    activeTab=null; toast('Tabblad verwijderd'); return load();
+  }
+  else if(a==='add-item') editing='new-item';
+  else if(a==='edit-item') editing=d.id;
+  else if(a==='ask-del-item') confirming=d.id;
+  else if(a==='del-item'){
+    const it=items.find(x=>x.id===d.id);
+    const {error}=await sb.from('items').delete().eq('id',d.id);
+    if(error) return toast('Verwijderen is niet gelukt.');
+    const paths=filePaths([it]); if(paths.length) sb.storage.from(BUCKET).remove(paths);
+    toast('Verwijderd'); return load();
+  }
+  else if(a==='cancel') editing=null;
+  render();
+}
+const filePaths = list => list.flatMap(i=>[i&&i.audio_path, i&&i.doc_path]).filter(Boolean);
+
+async function uploadFile(file){
+  const safe = file.name.normalize('NFKD').replace(/[^\w.\-]+/g,'_');
+  const path = `${crypto.randomUUID()}/${safe}`;
+  const {error} = await sb.storage.from(BUCKET).upload(path, file, {contentType: file.type || undefined, upsert:false});
+  if(error) throw error;
+  return path;
+}
+
+async function submit(f){
+  const kind=f.dataset.form;
+  if(kind==='login'){
+    const email=f.querySelector('#login-email').value.trim(), password=f.querySelector('#login-pass').value;
+    const {error}=await sb.auth.signInWithPassword({email,password});
+    if(error){ loginError='Inloggen mislukt. Controleer je e-mailadres en wachtwoord.'; render(); }
+    return;
+  }
+  if(kind==='tab-new'||kind==='tab-rename'){
+    const name=f.querySelector('#tab-name').value.trim(); if(!name) return;
+    let res;
+    if(kind==='tab-new') res = await sb.from('tabs').insert({name, position: tabs.length}).select().single();
+    else res = await sb.from('tabs').update({name}).eq('id',currentTab().id);
+    if(res.error) return toast('Opslaan is niet gelukt.');
+    if(kind==='tab-new') activeTab=res.data.id;
+    editing=null; toast(kind==='tab-new'?'Tabblad aangemaakt':'Naam opgeslagen'); return load();
+  }
+  if(kind==='item'){
+    const tab=currentTab();
+    const title=f.querySelector('#it-title').value.trim(); if(!title) return;
+    const ritual_date=f.querySelector('#it-date').value||null, note=f.querySelector('#it-note').value.trim()||null;
+    const aFile=f.querySelector('#it-audio').files[0], dFile=f.querySelector('#it-doc').files[0];
+    for(const file of [aFile,dFile]) if(file && file.size>50*1024*1024){ toast(`“${file.name}” is groter dan 50 MB.`); return; }
+    const existing = f.dataset.id ? items.find(x=>x.id===f.dataset.id) : null;
+    const row = {title, ritual_date, note}; const oldPaths=[];
+    busy=true;
+    try{
+      if(aFile){ progress='Muziek uploaden…'; render(); row.audio_path=await uploadFile(aFile); row.audio_name=aFile.name; if(existing&&existing.audio_path) oldPaths.push(existing.audio_path); }
+      if(dFile){ progress='Document uploaden…'; render(); row.doc_path=await uploadFile(dFile); row.doc_name=dFile.name; if(existing&&existing.doc_path) oldPaths.push(existing.doc_path); }
+      progress='Opslaan…'; render();
+      const res = existing ? await sb.from('items').update(row).eq('id',existing.id) : await sb.from('items').insert({...row, tab_id: tab.id});
+      if(res.error) throw res.error;
+      if(oldPaths.length) sb.storage.from(BUCKET).remove(oldPaths);
+      busy=false; progress=''; editing=null; toast(existing?'Wijzigingen opgeslagen':'Toegevoegd'); return load();
+    }catch(err){
+      busy=false; progress=''; render();
+      toast('Uploaden of opslaan is niet gelukt. Probeer het opnieuw.');
+      console.error(err);
+    }
+  }
+}
+
+sb.auth.onAuthStateChange((_e, session)=>{
+  const was=owner; owner=!!session;
+  if(owner) showLogin=false;
+  if(!owner){ editing=null; confirming=null; }
+  if(was!==owner) render();
+});
+(async()=>{ const {data}=await sb.auth.getSession(); owner=!!(data&&data.session); await load(); })();
+</script>
+</body>
+</html>
