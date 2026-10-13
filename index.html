@@ -102,6 +102,24 @@ select{font:inherit;font-size:15px;padding:8px 10px;border-radius:6px;border:1px
 .mrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding-block:10px;border-top:1px solid var(--line)}
 .memail{min-width:0;overflow-wrap:anywhere;font-family:var(--mono);font-size:14px}
 @media (max-width:520px){.mrow{grid-template-columns:1fr auto}.mrow>span:last-child{grid-column:1 / -1}}
+
+/* Sterrenhemel */
+:root{--star:#2a3f8f;--starline:#a47a1c}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--star:#e9e7f5;--starline:#d9b25a}}
+:root[data-theme="dark"]{--star:#e9e7f5;--starline:#d9b25a}
+#sky{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) #sky{opacity:.9}}
+:root[data-theme="dark"] #sky{opacity:.9}
+@media (min-width:900px){#sky{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(50% - 420px),rgba(0,0,0,.18) calc(50% - 370px),rgba(0,0,0,.18) calc(50% + 370px),#000 calc(50% + 420px));mask-image:linear-gradient(to right,#000 0,#000 calc(50% - 420px),rgba(0,0,0,.18) calc(50% - 370px),rgba(0,0,0,.18) calc(50% + 370px),#000 calc(50% + 420px))}}
+.wrap{position:relative;z-index:1}
+.zbox{display:flex;align-items:center;gap:18px;margin-top:18px;padding:14px 20px;border-radius:10px;border:1px solid rgba(217,178,90,.45);background:radial-gradient(circle at 10% 40%,#1d2b5e,#0a1128 72%);min-height:150px;box-sizing:border-box}
+.zbox canvas{flex:none;width:110px;height:110px}
+.ztext{display:flex;flex-direction:column;gap:4px;min-width:0}
+.zlabel{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#a8a3c7}
+#ztool-name{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.04em;color:#d9b25a}
+#ztool-text{margin:0;font-size:15.5px;line-height:1.5;color:#ecebf5;max-width:58ch}
+#ztool-name,#ztool-text{opacity:var(--zfade,1)}
+@media (max-width:520px){.zbox{gap:12px;padding:12px 14px;min-height:190px}.zbox canvas{width:76px;height:76px}#ztool-name{font-size:17px}#ztool-text{font-size:15px}}
 </style>
 </head>
 <body>
@@ -163,10 +181,11 @@ function header(){
   if(owner) nav = `<div class="row viewnav"><button class="${view==='muziek'?'primary':''}" data-act="view-muziek">Muziek</button><button class="${view==='leden'?'primary':''}" data-act="view-leden">Leden</button></div>`;
   return `<header class="top"><div class="brand"><img class="logo" src="${LOGO}" alt="Logo Loge Ramses" width="84" height="84"><div class="brand-text"><span class="eyebrow">Loge Ramses · Velp</span><h1>Ritueelmuziek</h1>
   <p class="sub">Muziek die tijdens de rituelen is gespeeld, met het bijbehorende document.</p></div></div>
+  <div class="zbox"><canvas id="zodiac" aria-hidden="true"></canvas><div class="ztext" aria-live="off"><span class="zlabel" id="ztool-cat">Symbolen van de vrijmetselarij</span><strong id="ztool-name"></strong><p id="ztool-text"></p></div></div>
   ${mode}${nav}</header>`;
 }
 function footer(){
-  return `<footer>${session ? `${esc(session.user.email)} · <button class="link" data-act="logout">Uitloggen</button>` : 'Alleen voor broeders van Loge Ramses.'}</footer>`;
+  return `<footer>${session ? `${esc(session.user.email)} · <button class="link" data-act="logout">Uitloggen</button>` : 'Alleen voor broeders en zusters van Loge Ramses.'}</footer>`;
 }
 
 function loginScreen(){
@@ -186,7 +205,7 @@ function loginScreen(){
 
 function membersView(){
   let h = `<section class="panel" style="border-radius:8px"><div class="panel-head"><h2>Leden</h2><span class="hint">${members.length} ${members.length===1?'e-mailadres':'e-mailadressen'}</span></div>
-  <p class="sub">Alleen deze e-mailadressen kunnen inloggen. Een broeder ziet de tabbladen van zijn eigen graad en lager.</p>
+  <p class="sub">Alleen deze e-mailadressen kunnen inloggen. Een broeder of zuster ziet de tabbladen van de eigen graad en lager.</p>
   <form class="edit member-add" data-form="member-add"><div class="grid2"><label>E-mailadres<input type="email" id="m-email" required placeholder="naam@voorbeeld.nl"></label><label>Graad${graadSelect('m-graad',1)}</label></div>
   <div class="row"><button class="primary" type="submit">Toevoegen</button></div></form>`;
   if(!members.length) h += `<div class="empty"><strong>Nog geen leden</strong><span>Voeg hierboven het eerste e-mailadres toe.</span></div>`;
@@ -546,6 +565,258 @@ sb.auth.onAuthStateChange((_e, s)=>{ setTimeout(()=>applySession(s), 0); });
   await applySession(data && data.session);
   // Na het klikken op de inloglink de lange code uit de adresbalk halen
   if(/access_token|error_description/.test(location.hash)) history.replaceState(null,'',location.pathname);
+})();
+</script>
+<script>
+/* Sterrenhemel op de achtergrond met vallende sterren,
+   en in een balk bij de titel de symbolen van de vrijmetselarij met hun betekenis */
+(function(){
+  const cv = document.createElement('canvas');
+  cv.id = 'sky'; cv.setAttribute('aria-hidden','true');
+  document.body.prepend(cv);
+  const ctx = cv.getContext('2d');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let W=0, H=0, dpr=1, stars=[], shoots=[], t0=performance.now(), raf=0;
+
+  // De werktuigen van de vrijmetselarij als lijntekening, met naam en betekenis
+  // Hulpjes om lijntekeningen op te bouwen (coördinaten 0–1)
+  const L = (pts, close=false, dot=true) => ({pts, close, dot});
+  const arc = (cx,cy,rx,ry,a0,a1,n) => Array.from({length:n+1},(_,i)=>{ const a=(a0+(a1-a0)*i/n)*Math.PI/180; return [cx+rx*Math.cos(a), cy+ry*Math.sin(a)]; });
+  const starPts = (cx,cy,R,r) => Array.from({length:10},(_,i)=>{ const a=(-90+i*36)*Math.PI/180, q=i%2?r:R; return [cx+q*Math.cos(a), cy+q*Math.sin(a)]; });
+  const pentaPts = (cx,cy,R) => [0,2,4,1,3].map(k=>{ const a=(-90+k*72)*Math.PI/180; return [cx+R*Math.cos(a), cy+R*Math.sin(a)]; });
+  const rect = (x1,y1,x2,y2,dot=true) => L([[x1,y1],[x2,y1],[x2,y2],[x1,y2]], true, dot);
+  function shape(...polys){
+    const p=[], l=[], dots=[];
+    polys.forEach(({pts,close,dot})=>{
+      const b=p.length; pts.forEach(q=>p.push(q));
+      if(dot) pts.forEach((_,i)=>dots.push(b+i));
+      for(let i=0;i<pts.length-1;i++) l.push([b+i,b+i+1]);
+      if(close && pts.length>2) l.push([b+pts.length-1,b]);
+    });
+    return {p,l,dots};
+  }
+
+  // Losse tekeningen die vaker terugkomen
+  const D = {
+    winkelhaak: () => shape(L([[.14,.08],[.3,.08],[.3,.74],[.92,.74],[.92,.92],[.14,.92]], true)),
+    passer: () => shape(L([[.2,.94],[.5,.06],[.8,.94]]), L([[.36,.5],[.64,.5]]), L(arc(.5,.06,.05,.05,0,360,10), false, false)),
+    boek: () => shape(L([[.05,.3],[.5,.38],[.95,.3],[.95,.82],[.5,.9],[.05,.82]], true), L([[.5,.38],[.5,.9]]), L([[.14,.42],[.42,.47]],false,false), L([[.14,.54],[.42,.59]],false,false), L([[.58,.47],[.86,.42]],false,false), L([[.58,.59],[.86,.54]],false,false)),
+    ster: () => shape(L(starPts(.5,.52,.44,.18), true)),
+    kolom: (x,w,top,bot,ball=true) => [rect(x,top,x+w,bot), L([[x-.03,top],[x+w+.03,top]]), L([[x-.03,bot],[x+w+.03,bot]]), ...(ball ? [L(arc(x+w/2,top-.07,.07,.07,0,360,12), false, false)] : [])]
+  };
+
+  const ruler = (()=>{ const polys=[rect(0,.42,1,.58)];
+    for(let k=1;k<24;k++){ const x=k/24; polys.push(L([[x,.42],[x,(k%8===0)?.52:.48]], false, false)); }
+    return shape(...polys); })();
+
+  const W1='Werktuigen', G='De drie grote lichten', B='Bouwkundige symbolen', K='Kleding en rituele attributen', N='Kosmische en natuurlijke symbolen', O='Overige symbolen';
+  const TOOLS = [
+    { c:W1, n:'De ruwe steen', m:'De mens in zijn ongevormde, natuurlijke staat, vol fouten en passies die nog overwonnen moeten worden.',
+      ...shape(L([[.2,.3],[.45,.12],[.78,.22],[.9,.5],[.75,.85],[.4,.9],[.12,.68]], true), L([[.45,.12],[.45,.45],[.62,.6],[.75,.85]])) },
+    { c:W1, n:'De 24-delige maatstok', m:'De evenredige verdeling van de tijd over arbeid, rust, zelfreflectie en hulp aan anderen.', ...ruler },
+    { c:W1, n:'De ruwe hamer (slegge)', m:'De wilskracht en energie die nodig zijn om de scherpe kanten van het eigen ego af te slaan.',
+      ...shape(rect(.08,.1,.92,.4), L([[.44,.4],[.44,.96],[.56,.96],[.56,.4]])) },
+    { c:W1, n:'De beitel', m:'De discipline, richting en verstandelijke sturing die de pure kracht van de hamer omzetten in verfijnde beschaving.',
+      ...shape(rect(.38,.04,.62,.4), L([[.45,.4],[.45,.84],[.5,.96],[.55,.84],[.55,.4]])) },
+    { c:W1, n:'De winkelhaak', m:'De morele wet, rechtvaardigheid en eerlijkheid in het handelen naar de medemens ("haaks handelen").', ...D.winkelhaak() },
+    { c:W1, n:'De waterpas', m:'De fundamentele gelijkwaardigheid van alle mensen en het bewaren van innerlijke balans.',
+      ...shape(L([[.08,.9],[.5,.1],[.92,.9]]), L([[.26,.58],[.74,.58]]), L([[.5,.1],[.5,.5]]), L(arc(.5,.53,.03,.03,0,360,8), false, false)) },
+    { c:W1, n:'Het schietlood (paslood)', m:'De innerlijke oprechtheid, rechtlijnigheid en de zoektocht naar diepere, verticale waarheid.',
+      ...shape(L([[.28,.05],[.72,.05]]), L([[.5,.05],[.5,.64]]), L([[.4,.64],[.6,.64],[.5,.92]], true)) },
+    { c:W1, n:'De troffel', m:'De liefde tussen broeders en zusters en de tolerantie die als cement dienen om de individuele leden tot één hechte gemeenschap te verbinden.',
+      ...shape(L([[.5,.96],[.18,.56],[.5,.42],[.82,.56]], true), L([[.5,.42],[.5,.28],[.5,.04]])) },
+    { c:W1, n:'De passer', m:'De matiging, de grens van de menselijke verhoudingen en de beheersing van passies ten opzichte van de buitenwereld.', ...D.passer() },
+    { c:W1, n:'Het tekenbord', m:'Het morele levensplan, het ontwerp en de spirituele blauwdruk waarnaar een mens leeft.',
+      ...shape(rect(.08,.12,.92,.88), rect(.26,.3,.54,.58), L([[.26,.3],[.54,.58]],false,false), L(arc(.72,.5,.12,.12,0,360,16),false,false)) },
+    { c:W1, n:'De kubieke steen', m:'De mens die door zelfreflectie en arbeid moreel gevormd is en klaar is om zijn nuttige plek in de samenleving in te nemen.',
+      ...shape(L([[.5,.1],[.88,.3],[.5,.5],[.12,.3]], true), L([[.12,.3],[.12,.72],[.5,.92],[.88,.72],[.88,.3]]), L([[.5,.5],[.5,.92]])) },
+
+    { c:G, n:'Het Boek der Heilige Wet', m:'De Bijbel, Thora, Koran of een wit boek. Symboliseert de bron van morele wetten en de hoogste spirituele wijsheid.', ...D.boek() },
+    { c:G, n:'De winkelhaak als Groot Licht', m:'Richt de handelingen en het morele kompas op het aardse en menselijke vlak.', ...D.winkelhaak() },
+    { c:G, n:'De passer als Groot Licht', m:'Richt de geest en het bewustzijn op het kosmische en spirituele vlak.', ...D.passer() },
+
+    { c:B, n:'De kolommen Jachin en Boaz', m:'Twee grote zuilen bij de ingang van de tempel. Boaz (links) staat voor kracht, Jachin (rechts) voor standvastigheid en oprichting. Samen symboliseren ze stabiliteit en dualiteit.',
+      ...shape(...D.kolom(.14,.18,.2,.94), ...D.kolom(.68,.18,.2,.94)) },
+    { c:B, n:'De drie kolommen', m:'Wijsheid, Kracht en Schoonheid dragen de loge symbolisch. Wijsheid ontwerpt, Kracht voert uit en Schoonheid siert het levenswerk.',
+      ...shape(...D.kolom(.06,.16,.3,.94,false), ...D.kolom(.42,.16,.12,.94,false), ...D.kolom(.78,.16,.3,.94,false)) },
+    { c:B, n:'De Tempel van Salomo', m:'Het uiteindelijke symbolische doel: het bouwen aan een betere wereld en een verheven mensheid.',
+      ...shape(L([[.04,.34],[.5,.06],[.96,.34]], true), L([[.04,.94],[.96,.94]]), L([[.2,.34],[.2,.94]],false,false), L([[.4,.34],[.4,.94]],false,false), L([[.6,.34],[.6,.94]],false,false), L([[.8,.34],[.8,.94]],false,false)) },
+    { c:B, n:'De mozaïeke vloer', m:'De vloer van zwarte en witte tegels. Symboliseert de dualiteit van het leven: goed en kwaad, vreugde en verdriet, licht en duisternis.',
+      ...(()=>{ const polys=[L([[.5,.1],[.95,.5],[.5,.9],[.05,.5]], true)];
+        for(let k=1;k<4;k++){ const f=k/4;
+          polys.push(L([[.5+.45*f,.1+.4*f],[.05+.45*f,.5+.4*f]],false,false));
+          polys.push(L([[.5-.45*f,.1+.4*f],[.95-.45*f,.5+.4*f]],false,false)); }
+        return shape(...polys); })() },
+    { c:B, n:'De vlammende ster', m:'Een vijfpuntige ster, vaak met de letter G in het midden. Staat voor het universele licht, de rede, de kosmos en de goddelijke vonk in de mens.',
+      ...(()=>{ const polys=[L(starPts(.5,.52,.36,.15), true)];
+        for(let k=0;k<5;k++){ const a=(-54+k*72)*Math.PI/180; polys.push(L([[.5+.22*Math.cos(a),.52+.22*Math.sin(a)],[.5+.46*Math.cos(a),.52+.46*Math.sin(a)]],false,false)); }
+        return shape(...polys); })() },
+    { c:B, n:'De letter G', m:'Staat voor Geometrie (meetkunde), God of de Alziende Architect, en Gnosis (kennis van de geest).',
+      ...shape(L(arc(.5,.5,.4,.42,-40,-320,18), false, false), L([[.5+.4*Math.cos(40*Math.PI/180),.5+.42*Math.sin(40*Math.PI/180)],[.5+.4*Math.cos(40*Math.PI/180),.56],[.56,.56]])) },
+    { c:B, n:'Het Alziend Oog', m:'De aanwezigheid van de Opperbouwmeester des Heelals, die herinnert aan kosmisch bewustzijn en morele verantwoordelijkheid.',
+      ...shape(L([[.5,.05],[.95,.9],[.05,.9]], true), L(arc(.5,.72,.24,.17,-160,-20,10),false,false), L(arc(.5,.6,.24,.15,20,160,10),false,false), L(arc(.5,.655,.055,.055,0,360,10),false,false)) },
+
+    { c:K, n:'Het schootsvel', m:'Gemaakt van wit leer. Symboliseert de noodzaak tot arbeid en herinnert aan de plicht om de handen rein en het geweten zuiver te houden.',
+      ...shape(rect(.12,.36,.88,.92), L([[.12,.36],[.5,.62],[.88,.36]]), L([[.0,.36],[.12,.36]],false,false), L([[.88,.36],[1,.36]],false,false)) },
+    { c:K, n:'De witte handschoenen', m:'Symboliseren de reinheid van het denken en handelen: de belofte om geen onethische daden te verrichten.',
+      ...shape(L([[.3,.95],[.3,.55],[.12,.42],[.18,.36],[.32,.44],[.32,.12],[.4,.08],[.44,.4],[.48,.05],[.56,.06],[.58,.4],[.62,.1],[.7,.12],[.7,.42],[.74,.2],[.82,.22],[.78,.6],[.7,.95]], true)) },
+    { c:K, n:'Het knopenkoord (de broederketen)', m:'Het touw met liefdesknopen rond het plafond, dat de wereldwijde, onverbrekelijke band tussen vrijmetselaars symboliseert.',
+      ...(()=>{ const polys=[L(Array.from({length:25},(_,i)=>[i/24, .5+.12*Math.sin(i/24*Math.PI*4)]), false, false)];
+        [.125,.375,.625,.875].forEach(x=>polys.push(L(arc(x,.5+.12*Math.sin(x*Math.PI*4),.06,.06,0,360,10),false,false)));
+        return shape(...polys); })() },
+    { c:K, n:'De cable tow', m:'Het touw dat de kandidaat draagt tijdens de inwijding. Symboliseert wereldse bindingen die worden omgezet in een vrijwillige innerlijke plicht.',
+      ...shape(L(arc(.5,.3,.22,.22,0,360,18),false,false), L(Array.from({length:9},(_,i)=>[.5+.06*Math.sin(i*1.2), .52+i*.055]),false,false)) },
+    { c:K, n:'Het zwaard', m:'Symbool voor bescherming, gerechtigheid en de plicht om de waarheid en de loge te verdedigen.',
+      ...shape(L([[.46,.7],[.46,.12],[.5,.03],[.54,.12],[.54,.7]]), L([[.26,.7],[.74,.7]]), L([[.5,.7],[.5,.9]]), L(arc(.5,.94,.04,.04,0,360,8),false,false)) },
+    { c:K, n:'De meesterhamer', m:'Het symbool van het gezag en de leiding van de Voorzittend Meester.',
+      ...shape(rect(.18,.18,.82,.42), L([[.46,.42],[.46,.96],[.54,.96],[.54,.42]])) },
+
+    { c:N, n:'De zon en de maan', m:'De zon symboliseert de dag, de rede en het actieve, mannelijke principe. De maan symboliseert de nacht, de intuïtie en het reflectieve, vrouwelijke principe.',
+      ...(()=>{ const polys=[L(arc(.3,.5,.16,.16,0,360,16),false,false)];
+        for(let k=0;k<8;k++){ const a=k*45*Math.PI/180; polys.push(L([[.3+.21*Math.cos(a),.5+.21*Math.sin(a)],[.3+.28*Math.cos(a),.5+.28*Math.sin(a)]],false,false)); }
+        polys.push(L(arc(.78,.5,.2,.2,-110,110,12),false,false), L(arc(.86,.5,.15,.17,-115,115,12),false,false));
+        return shape(...polys); })() },
+    { c:N, n:'De acaciatak', m:'Een symbool van onsterfelijkheid, hoop en de onvergankelijkheid van de menselijke ziel na de dood (centraal in de Meestergraad).',
+      ...(()=>{ const polys=[L([[.5,.98],[.5,.05]])];
+        for(let k=0;k<5;k++){ const y=.2+k*.15; polys.push(L([[.5,y],[.26,y-.08]],false,false), L([[.5,y],[.74,y-.08]],false,false)); }
+        return shape(...polys); })() },
+    { c:N, n:'De korenaar', m:'Staat voor overvloed, de vruchten van de geleverde arbeid en persoonlijke groei.',
+      ...(()=>{ const polys=[L([[.5,.98],[.5,.08]],false,false)];
+        for(let k=0;k<5;k++){ const y=.16+k*.12; polys.push(L(arc(.42,y+.04,.07,.05,0,360,8),false,false), L(arc(.58,y,.07,.05,0,360,8),false,false)); }
+        return shape(...polys); })() },
+    { c:N, n:'De doodskist, het doodshoofd en de gekruiste beenderen', m:'Symbolen van de vergankelijkheid van het aardse leven (memento mori). Ze herinneren eraan dat het ego moet sterven om spiritueel herboren te worden.',
+      ...shape(L([[.5,.02],[.72,.2],[.62,.98],[.38,.98],[.28,.2]], true), L([[.38,.38],[.62,.72]]), L([[.62,.38],[.38,.72]])) },
+    { c:N, n:'De zandloper', m:'Symboliseert het onverbiddelijk wegglijden van de tijd en de kostbaarheid van elk moment.',
+      ...shape(L([[.18,.05],[.82,.05]]), L([[.18,.95],[.82,.95]]), L([[.26,.05],[.74,.95]]), L([[.74,.05],[.26,.95]]), L([[.38,.8],[.62,.8]],false,false)) },
+    { c:N, n:'Het pentagram', m:'Symboliseert de microkosmos: de mens in perfecte harmonie, en de vijf zintuigen.',
+      ...shape(L(pentaPts(.5,.54,.44), true)) },
+
+    { c:O, n:'Passer en winkelhaak ineen', m:'Hét universele beeld van de vrijmetselarij: de balans tussen de aardse moraal (winkelhaak) en de spirituele zelfbeheersing (passer).',
+      ...shape(L([[.22,.92],[.5,.06],[.78,.92]]), L([[.08,.6],[.5,.98],[.92,.6]])) },
+    { c:O, n:'Passer, winkelhaak en Bijbel', m:'Samen bekend als de drie bakens die de vrijmetselaar de weg wijzen door het leven.',
+      ...shape(L([[.05,.62],[.5,.68],[.95,.62],[.95,.92],[.5,.98],[.05,.92]], true), L([[.5,.68],[.5,.98]]), L([[.3,.6],[.5,.05],[.7,.6]]), L([[.2,.42],[.5,.66],[.8,.42]])) },
+    { c:O, n:'De drie punten (∴)', m:'Staan vaak achter afkortingen, zoals B∴ voor broeder en Z∴ voor zuster. Ze symboliseren de maçonnieke drie-eenheid, zoals Wijsheid, Kracht en Schoonheid.',
+      ...shape(L([[.5,.22]]), L([[.26,.72]]), L([[.74,.72]])) }
+  ];
+  const CYCLE = 14000;
+  const startAt = Math.floor(Math.random()*TOOLS.length); // elke bezoeker begint bij een ander symbool // ms per sterrenbeeld: opbouwen, staan, vervagen
+
+  const col = () => {
+    const cs = getComputedStyle(document.documentElement);
+    return { star: cs.getPropertyValue('--star').trim() || '#e7e6f0', line: cs.getPropertyValue('--starline').trim() || '#d9b25a' };
+  };
+  let C = col();
+
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = innerWidth; H = innerHeight;
+    cv.width = W*dpr; cv.height = H*dpr; cv.style.width = W+'px'; cv.style.height = H+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const n = Math.round(Math.min(220, W*H/7000));
+    stars = Array.from({length:n}, ()=>({
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()<.08 ? 1.6+Math.random()*.8 : .5+Math.random()*.9,
+      tw: Math.random()*Math.PI*2, sp: .6+Math.random()*1.4,
+      vx: (Math.random()-.5)*.025, vy: (Math.random()-.5)*.025
+    }));
+    C = col();
+    if(reduce.matches) draw(0, true);
+  }
+
+  // Werktuig in de balk onder de titel (canvas #zodiac wordt door de app opnieuw getekend; we zoeken hem elke keer op)
+  function drawZodiac(t, still){
+    const zc = document.getElementById('zodiac'); if(!zc) return;
+    const bw = zc.clientWidth, bh = zc.clientHeight; if(!bw||!bh) return;
+    if(zc.width !== Math.round(bw*dpr) || zc.height !== Math.round(bh*dpr)){ zc.width = Math.round(bw*dpr); zc.height = Math.round(bh*dpr); }
+    const z2 = zc.getContext('2d'); z2.setTransform(dpr,0,0,dpr,0,0); z2.clearRect(0,0,bw,bh);
+    t = Math.max(0, t);
+    const idx = (startAt + Math.floor(t / CYCLE)) % TOOLS.length, z = TOOLS[idx];
+    const f = still ? .5 : (t % CYCLE) / CYCLE;
+    const build = Math.min(1, f/.3);
+    const fade = f < .06 ? f/.06 : f > .86 ? Math.max(0,(1-f)/.14) : 1;
+    // Tekening vult het vierkante canvas
+    const s = Math.min(bw, bh)*.8;
+    const ox = (bw - s)/2, oy = (bh - s)/2;
+    // Figuur passend en gecentreerd in het vierkant zetten
+    const xs = z.p.map(q=>q[0]), ys = z.p.map(q=>q[1]);
+    const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
+    const sc = s / Math.max(maxX-minX, maxY-minY, .01);
+    const offX = ox + (s - (maxX-minX)*sc)/2, offY = oy + (s - (maxY-minY)*sc)/2;
+    const P = z.p.map(([x,y])=>[offX + (x-minX)*sc, offY + (y-minY)*sc]);
+    z2.strokeStyle = '#d9b25a'; z2.lineWidth = 1;
+    const total = z.l.length;
+    z.l.forEach(([a,b],i)=>{
+      const part = Math.max(0, Math.min(1, build*total - i)); if(!part) return;
+      const [x1,y1]=P[a], [x2,y2]=P[b];
+      z2.globalAlpha = .8*fade; z2.beginPath(); z2.moveTo(x1,y1); z2.lineTo(x1+(x2-x1)*part, y1+(y2-y1)*part); z2.stroke();
+    });
+    z2.fillStyle = '#f2f0ff';
+    (z.dots || P.map((_,i)=>i)).forEach(i=>{ const [x,y]=P[i];
+      const r = z.p.length <= 3 ? 5 : 1.7;
+      z2.globalAlpha = fade; z2.beginPath(); z2.arc(x,y,r,0,Math.PI*2); z2.fill();
+      z2.globalAlpha = .25*fade; z2.beginPath(); z2.arc(x,y,r*2.5,0,Math.PI*2); z2.fill();
+    });
+    // Naam en betekenis als gewone tekst naast de tekening
+    const nameEl = document.getElementById('ztool-name'), textEl = document.getElementById('ztool-text'), box = zc.closest('.zbox');
+    if(nameEl && nameEl.dataset.i !== String(idx)){ nameEl.textContent = z.n; textEl.textContent = z.m; nameEl.dataset.i = idx; const cat=document.getElementById('ztool-cat'); if(cat) cat.textContent = 'Symbolen van de vrijmetselarij · ' + z.c; }
+    if(box){ const o = Math.max(0, Math.min(1, fade*Math.min(1, build*1.6))).toFixed(2); if(box.style.getPropertyValue('--zfade') !== o) box.style.setProperty('--zfade', o); }
+    z2.globalAlpha = 1;
+  }
+
+  function wrap(c, text, max, font){
+    c.save(); c.font = font; const out=[]; let line='';
+    for(const w of text.split(' ')){ const tryL = line ? line+' '+w : w; if(c.measureText(tryL).width > max && line){ out.push(line); line=w; } else line=tryL; }
+    if(line) out.push(line); c.restore(); return out;
+  }
+
+  function draw(t, still){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = C.star;
+    for(const s of stars){
+      ctx.globalAlpha = .35 + .65*(.5+.5*Math.sin(s.tw + t*.001*s.sp));
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+      if(s.r>1.6){ ctx.globalAlpha*=.25; ctx.beginPath(); ctx.arc(s.x,s.y,s.r*3,0,Math.PI*2); ctx.fill(); }
+    }
+    drawZodiac(t, still);
+    // Vallende sterren
+    shoots = shoots.filter(sh => (t-sh.t) < sh.dur);
+    for(const sh of shoots){
+      const p = (t-sh.t)/sh.dur;
+      const x = sh.x + sh.dx*p, y = sh.y + sh.dy*p;
+      const g = ctx.createLinearGradient(x,y,x-sh.dx*.18,y-sh.dy*.18);
+      g.addColorStop(0,C.star); g.addColorStop(1,'transparent');
+      ctx.globalAlpha = Math.sin(p*Math.PI);
+      ctx.strokeStyle = g; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-sh.dx*.18,y-sh.dy*.18); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function step(now){
+    const t = Math.max(0, now - t0);
+    for(const s of stars){
+      s.x += s.vx; s.y += s.vy;
+      if(s.x<-5) s.x=W+5; if(s.x>W+5) s.x=-5; if(s.y<-5) s.y=H+5; if(s.y>H+5) s.y=-5;
+    }
+    // Ongeveer elke 1,5 à 2 seconden een nieuwe vallende ster, maximaal 3 tegelijk
+    if(shoots.length<3 && Math.random()<.01){
+      const fromLeft = Math.random()<.5;
+      shoots.push({ x: fromLeft ? Math.random()*W*.45 : W*.55+Math.random()*W*.45, y: Math.random()*H*.6,
+                dx: (fromLeft?1:-1)*(200+Math.random()*220), dy: 110+Math.random()*120, t, dur: 700+Math.random()*600 });
+    }
+    draw(t);
+    raf = requestAnimationFrame(step);
+  }
+
+  let stillTimer=0;
+  function start(){ cancelAnimationFrame(raf); clearInterval(stillTimer);
+    if(reduce.matches || document.hidden){ const show=()=>draw(performance.now()-t0, true); show(); if(reduce.matches && !document.hidden) stillTimer=setInterval(show, CYCLE); return; }
+    raf = requestAnimationFrame(step); }
+  addEventListener('resize', resize);
+  document.addEventListener('visibilitychange', start);
+  reduce.addEventListener && reduce.addEventListener('change', start);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', ()=>{ C=col(); });
+  resize(); start();
 })();
 </script>
 </body>
