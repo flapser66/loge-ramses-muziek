@@ -79,6 +79,24 @@ input[type=email],input[type=password]{font:inherit;font-size:15px;padding:8px 1
 .err{color:var(--danger);font-size:14px;margin:0}
 .progress{font-family:var(--mono);font-size:13px;color:var(--gold)}
 footer button.link{font-size:13px}
+.drop{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:22px 16px;border:2px dashed var(--line);border-radius:8px;color:var(--muted);font-size:14px}
+.drop strong{font-family:var(--display);font-weight:500;letter-spacing:.05em;color:var(--ink);font-size:16px}
+.drop span{max-width:52ch}
+.drop.over,.tab.over{border-color:var(--gold);background:var(--gold-soft);color:var(--ink)}
+.drop-date{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px}
+.drop-date input{width:auto}
+label.btn{display:inline-flex;align-items:center}
+.tabdoc{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:8px;background:var(--gold-soft);border:1px solid transparent}
+.tabdoc.over{border-color:var(--gold)}
+label.link-like{border:none;background:transparent;color:var(--blue);padding:4px 6px}
+select{font:inherit;font-size:15px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:100%}
+.viewnav{margin-top:10px}
+.gbadge{display:inline-block;min-width:1.4em;margin-left:4px;padding:0 5px;border-radius:999px;font-family:var(--mono);font-size:11px;background:var(--gold-soft);color:var(--gold);text-align:center}
+.panel-head h2 .hint{font-family:var(--body);letter-spacing:0;font-size:13px}
+.mtable{display:flex;flex-direction:column}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding-block:10px;border-top:1px solid var(--line)}
+.memail{min-width:0;overflow-wrap:anywhere;font-family:var(--mono);font-size:14px}
+@media (max-width:520px){.mrow{grid-template-columns:1fr auto}.mrow>span:last-child{grid-column:1 / -1}}
 </style>
 </head>
 <body>
@@ -96,7 +114,10 @@ const BUCKET = 'ritueel';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let tabs = [], items = [], owner = false;
-let activeTab = null, editing = null, confirming = null, busy = false, progress = '', showLogin = false, loginError = '', loadError = '';
+let activeTab = null, editing = null, confirming = null, busy = false, progress = '', loginError = '', loadError = '';
+let session = null, role = null, view = 'muziek', members = [], loginSent = '', ready = false;
+const GRADEN = {1:'Leerling', 2:'Gezel', 3:'Meester'};
+const graadSelect = (id, val) => `<select id="${id}">${[1,2,3].map(g=>`<option value="${g}" ${Number(val)===g?'selected':''}>${g} · ${GRADEN[g]}</option>`).join('')}</select>`;
 try{ activeTab = (location.hash||'').slice(1) || localStorage.getItem('ramses-tab'); }catch(e){}
 const root = document.getElementById('root');
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -106,7 +127,16 @@ const publicUrl = (path, downloadName) => sb.storage.from(BUCKET).getPublicUrl(p
 
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; t.setAttribute('role','status'); document.body.appendChild(t); setTimeout(()=>t.remove(),4000); }
 function currentTab(){ let t=tabs.find(x=>x.id===activeTab); if(!t){ t=tabs[0]||null; activeTab=t?t.id:null; } return t; }
-const itemsOf = tabId => items.filter(i=>i.tab_id===tabId).sort((a,b)=>(b.ritual_date||'').localeCompare(a.ritual_date||'') || (b.created_at||'').localeCompare(a.created_at||''));
+const itemsOf = tabId => items.filter(i=>i.tab_id===tabId).sort((a,b)=>(b.ritual_date||'').localeCompare(a.ritual_date||'') || (a.created_at||'').localeCompare(b.created_at||''));
+// Datum van het eerste nummer dat in dit tabblad is gezet
+function tabDate(tabId){
+  const first = items.filter(i=>i.tab_id===tabId && i.ritual_date).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''))[0];
+  return first ? first.ritual_date : '';
+}
+const AUDIO_EXT = ['mp3','m4a','wav','ogg','aac','flac','wma'];
+const DOC_EXT = ['pdf','doc','docx'];
+const baseName = n => String(n).replace(/\.[^.]+$/,'');
+const prettyTitle = n => baseName(n).replace(/[_]+/g,' ').replace(/\s+/g,' ').trim();
 
 async function load(){
   const [t,i] = await Promise.all([
@@ -119,31 +149,66 @@ async function load(){
 }
 
 function header(){
+  let mode = '';
+  if(role && owner) mode = `<span class="mode owner">Beheer — jij kunt wijzigen</span>`;
+  else if(role && role.graad) mode = `<span class="mode">${role.graad}e graad · ${GRADEN[role.graad]} — bekijken en downloaden</span>`;
+  let nav = '';
+  if(owner) nav = `<div class="row viewnav"><button class="${view==='muziek'?'primary':''}" data-act="view-muziek">Muziek</button><button class="${view==='leden'?'primary':''}" data-act="view-leden">Leden</button></div>`;
   return `<header class="top"><span class="eyebrow">Loge Ramses · Velp</span><h1>Ritueelmuziek</h1>
   <p class="sub">Muziek die tijdens de rituelen is gespeeld, met het bijbehorende document.</p>
-  <span class="mode ${owner?'owner':''}">${owner?'Beheer — jij kunt wijzigen':'Alleen bekijken en downloaden'}</span></header>`;
+  ${mode}${nav}</header>`;
 }
 function footer(){
-  return `<footer>${owner
-    ? `Wijzigingen zijn direct zichtbaar voor iedereen met de link. <button class="link" data-act="logout">Uitloggen</button>`
-    : `Alleen de broeder van talent kan hier iets toevoegen of wijzigen. <button class="link" data-act="show-login">Beheer</button>`}</footer>`;
+  return `<footer>${session ? `${esc(session.user.email)} · <button class="link" data-act="logout">Uitloggen</button>` : 'Alleen voor broeders van Loge Ramses.'}</footer>`;
+}
+
+function loginScreen(){
+  if(loginSent) return `<div class="login" style="margin-top:24px"><h2>Kijk in je mail</h2>
+    <p class="sub">We hebben een inloglink gestuurd naar <strong>${esc(loginSent)}</strong>. Klik op de link in die mail om binnen te komen. Zie je niets? Kijk ook in je map met ongewenste mail.</p>
+    <div class="row"><button type="button" data-act="login-again">Ander e-mailadres</button></div></div>`;
+  return `<form class="login" data-form="login" style="margin-top:24px"><h2>Inloggen</h2>
+    <p class="sub">Vul je e-mailadres in en kies je graad. Je krijgt een inloglink per mail.</p>
+    <label>E-mailadres<input type="email" id="login-email" required autocomplete="email"></label>
+    <label>Graad${graadSelect('login-graad',1)}</label>
+    ${loginError?`<p class="err">${esc(loginError)}</p>`:''}
+    <div class="row"><button class="primary" type="submit" ${busy?'disabled':''}>${busy?'Versturen…':'Stuur inloglink'}</button></div></form>`;
+}
+
+function membersView(){
+  let h = `<section class="panel" style="border-radius:8px"><div class="panel-head"><h2>Leden</h2><span class="hint">${members.length} ${members.length===1?'e-mailadres':'e-mailadressen'}</span></div>
+  <p class="sub">Alleen deze e-mailadressen kunnen inloggen. Een broeder ziet de tabbladen van zijn eigen graad en lager.</p>
+  <form class="edit member-add" data-form="member-add"><div class="grid2"><label>E-mailadres<input type="email" id="m-email" required placeholder="naam@voorbeeld.nl"></label><label>Graad${graadSelect('m-graad',1)}</label></div>
+  <div class="row"><button class="primary" type="submit">Toevoegen</button></div></form>`;
+  if(!members.length) h += `<div class="empty"><strong>Nog geen leden</strong><span>Voeg hierboven het eerste e-mailadres toe.</span></div>`;
+  h += `<div class="mtable" role="table">`;
+  members.forEach(m=>{
+    h += `<div class="mrow" role="row"><span class="memail" role="cell">${esc(m.email)}</span><span role="cell">${graadSelect('g-'+btoa(m.email).replace(/=/g,''), m.graad).replace('<select','<select data-member="'+esc(m.email)+'"')}</span>`;
+    h += confirming==='m:'+m.email
+      ? `<span role="cell" class="row"><button class="danger" data-act="del-member" data-email="${esc(m.email)}">Verwijderen</button><button data-act="cancel">Annuleren</button></span>`
+      : `<span role="cell"><button class="link" data-act="ask-del-member" data-email="${esc(m.email)}">Verwijderen</button></span>`;
+    h += `</div>`;
+  });
+  return h + `</div></section>`;
+}
+async function loadMembers(){
+  const r = await sb.from('members').select('*').order('graad').order('email');
+  if(r.error){ toast('Ledenlijst kon niet worden geladen.'); return; }
+  members = r.data; render();
 }
 
 function render(){
   let h = header();
-  if(showLogin && !owner){
-    h += `<form class="login" data-form="login" style="margin-top:24px"><h2>Inloggen beheer</h2>
-      <label>E-mailadres<input type="email" id="login-email" required autocomplete="username"></label>
-      <label>Wachtwoord<input type="password" id="login-pass" required autocomplete="current-password"></label>
-      ${loginError?`<p class="err">${esc(loginError)}</p>`:''}
-      <div class="row"><button class="primary" type="submit">Inloggen</button><button type="button" data-act="hide-login">Annuleren</button></div></form>`;
-    root.innerHTML = h; bind(); return;
+  if(!ready){ root.innerHTML = h + `<p class="sub">Laden…</p>`; return; }
+  if(!session){ root.innerHTML = h + loginScreen() + footer(); bind(); return; }
+  if(!role || (!role.admin && !role.graad)){
+    root.innerHTML = h + `<div class="empty"><strong>Geen toegang</strong><span>Het e-mailadres ${esc(session.user.email)} staat niet op de ledenlijst. Neem contact op met de broeder van talent.</span></div>` + footer(); bind(); return;
   }
+  if(owner && view==='leden'){ root.innerHTML = h + membersView() + footer(); bind(); return; }
   if(loadError){ root.innerHTML = h + `<div class="empty"><strong>Niet geladen</strong><span>${esc(loadError)}</span><button data-act="reload">Opnieuw proberen</button></div>` + footer(); bind(); return; }
 
   const tab = currentTab();
   h += `<nav class="tabs" role="tablist">`;
-  tabs.forEach(t=>{ h+=`<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${!!tab&&t.id===tab.id}">${esc(t.name)}</button>`; });
+  tabs.forEach(t=>{ h+=`<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${!!tab&&t.id===tab.id}">${esc(t.name)}${owner?` <span class="gbadge" title="${GRADEN[t.graad||1]}">${t.graad||1}</span>`:''}</button>`; });
   if(owner) h+=`<button class="tab add" data-act="new-tab">+ Tabblad</button>`;
   h += `</nav>`;
 
@@ -158,13 +223,15 @@ function render(){
   h += `<section class="panel" role="tabpanel"><div class="panel-head">`;
   if(owner && editing==='rename-tab') h += tabNameForm('rename', tab.name);
   else {
-    h += `<h2>${esc(tab.name)}</h2>`;
+    h += `<h2>${esc(tab.name)}${owner?` <span class="hint">· zichtbaar vanaf ${tab.graad||1}e graad (${GRADEN[tab.graad||1]})</span>`:''}</h2>`;
     if(owner) h += `<div class="row"><button class="link" data-act="rename-tab">Naam wijzigen</button><button class="link" data-act="ask-del-tab">Tabblad verwijderen</button><button class="primary" data-act="add-item">+ Muziek toevoegen</button></div>`;
   }
   h += `</div>`;
+  h += tabDocBlock(tab);
   if(owner && editing==='new-tab') h += tabNameForm('new');
   if(confirming==='tab') h += `<div class="confirm">Tabblad “${esc(tab.name)}” met ${list.length} ${list.length===1?'nummer':'nummers'} verwijderen? <button class="danger" data-act="del-tab">Verwijderen</button><button data-act="cancel">Annuleren</button></div>`;
   if(owner && editing==='new-item') h += itemForm(null);
+  if(owner && !editing) h += dropZone(tab);
 
   if(!list.length && editing!=='new-item'){
     h += `<div class="empty"><strong>Dit tabblad is nog leeg</strong><span>${owner?'Voeg een muzieknummer toe met het bijbehorende Word- of PDF-document.':'Hier is nog niets geplaatst.'}</span>${owner?'<button class="primary" data-act="add-item">+ Muziek toevoegen</button>':''}</div>`;
@@ -192,13 +259,57 @@ function render(){
 function fileLink(path,name,kind){
   return `<a class="btn file" href="${esc(publicUrl(path,name))}" download="${esc(name)}" title="Download ${esc(name)}"><span class="kind">${kind}</span><span class="name">${esc(name)}</span><span aria-hidden="true">↓</span></a>`;
 }
+// Los document bij het hele tabblad (bijv. een bouwstuk over de muziek)
+function tabDocBlock(tab){
+  if(!tab.doc_path && !owner) return '';
+  let h = `<div class="tabdoc"><div class="tabdoc-head"><span class="eyebrow">Document bij dit tabblad</span></div>`;
+  if(tab.doc_path){
+    h += `<div class="files">${fileLink(tab.doc_path, tab.doc_name, ext(tab.doc_name)==='pdf'?'PDF':'Word')}</div>`;
+    if(owner){
+      if(confirming==='tabdoc') h += `<div class="confirm">“${esc(tab.doc_name)}” weghalen? <button class="danger" data-act="del-tabdoc">Weghalen</button><button data-act="cancel">Annuleren</button></div>`;
+      else h += `<div class="row"><label class="btn link-like">Vervangen<input type="file" id="tabdoc-file" accept=".pdf,.doc,.docx" hidden></label><button class="link" data-act="ask-del-tabdoc">Weghalen</button></div>`;
+    }
+  } else {
+    h += `<div class="row"><span class="hint">Nog geen document. Plaats hier bijvoorbeeld een bouwstuk over de hele muziekmap.</span><label class="btn">Document toevoegen<input type="file" id="tabdoc-file" accept=".pdf,.doc,.docx" hidden></label></div>`;
+  }
+  if(progress && busy==='tabdoc') h += `<span class="progress">${esc(progress)}</span>`;
+  return h + `</div>`;
+}
+async function setTabDoc(file){
+  const tab=currentTab(); if(!owner||!tab||!file||busy) return;
+  if(!DOC_EXT.includes(ext(file.name))){ toast('Kies een PDF- of Word-bestand.'); return; }
+  if(file.size>50*1024*1024){ toast(`“${file.name}” is groter dan 50 MB.`); return; }
+  busy='tabdoc'; progress='Document uploaden…'; render();
+  try{
+    const path=await uploadFile(file);
+    const res=await sb.from('tabs').update({doc_path:path, doc_name:file.name}).eq('id',tab.id);
+    if(res.error) throw res.error;
+    if(tab.doc_path) sb.storage.from(BUCKET).remove([tab.doc_path]);
+    toast('Document geplaatst');
+  }catch(err){ console.error(err); toast('Uploaden is niet gelukt. Probeer het opnieuw.'); }
+  busy=false; progress=''; load();
+}
+function dropZone(tab){
+  const d = tabDate(tab.id);
+  return `<div class="drop" id="drop-zone" tabindex="0">
+    <strong>Sleep muziek en documenten hierheen</strong>
+    <span>Meerdere bestanden tegelijk mag. Elk muziekbestand wordt een nummer; een Word- of PDF-bestand met dezelfde naam wordt eraan gekoppeld.</span>
+    <div class="row" style="justify-content:center">
+      <label class="drop-date">Datum ritueel <input type="date" id="bulk-date" value="${esc(d)}"></label>
+      <label class="btn">Bestanden kiezen<input type="file" id="bulk-files" multiple accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac,.pdf,.doc,.docx" hidden></label>
+    </div>
+    ${d?`<span class="hint">Datum overgenomen van het eerste nummer in dit tabblad.</span>`:''}
+    ${progress&&busy===true?`<span class="progress">${esc(progress)}</span>`:''}
+  </div>`;
+}
 function tabNameForm(mode,val){
-  return `<form class="edit" data-form="tab-${mode}" style="width:100%;box-sizing:border-box"><label>Naam van het tabblad<input type="text" id="tab-name" required maxlength="60" value="${esc(val||'')}" placeholder="bijv. Eerste graad"></label><div class="row"><button class="primary" type="submit">${mode==='new'?'Tabblad maken':'Opslaan'}</button>${(mode==='rename'||tabs.length)?'<button type="button" data-act="cancel">Annuleren</button>':''}</div></form>`;
+  const g = mode==='rename' && currentTab() ? (currentTab().graad||1) : 1;
+  return `<form class="edit" data-form="tab-${mode}" style="width:100%;box-sizing:border-box"><div class="grid2"><label>Naam van het tabblad<input type="text" id="tab-name" required maxlength="60" value="${esc(val||'')}" placeholder="bijv. Installatie juni"></label><label>Zichtbaar vanaf graad${graadSelect('tab-graad', g)}</label></div><div class="row"><button class="primary" type="submit">${mode==='new'?'Tabblad maken':'Opslaan'}</button>${(mode==='rename'||tabs.length)?'<button type="button" data-act="cancel">Annuleren</button>':''}</div></form>`;
 }
 function itemForm(it){
   return `<form class="edit" data-form="item" data-id="${it?it.id:''}">
   <div class="grid2"><label>Titel van het nummer<input type="text" id="it-title" required maxlength="140" value="${esc(it?it.title:'')}" placeholder="bijv. Air – J.S. Bach"></label>
-  <label>Datum ritueel<input type="date" id="it-date" value="${esc(it?it.ritual_date||'':'')}"></label></div>
+  <label>Datum ritueel<input type="date" id="it-date" value="${esc(it?it.ritual_date||'':tabDate(activeTab))}"></label></div>
   <label>Toelichting (optioneel)<textarea id="it-note" rows="2" maxlength="600" placeholder="bijv. gespeeld bij de opening">${esc(it?it.note||'':'')}</textarea></label>
   <label>Muziekbestand${it&&it.audio_name?` <span class="hint">huidig: ${esc(it.audio_name)}</span>`:''}<input type="file" id="it-audio" accept="audio/*,.mp3,.m4a,.wav,.ogg"></label>
   <label>Document (Word of PDF)${it&&it.doc_name?` <span class="hint">huidig: ${esc(it.doc_name)}</span>`:''}<input type="file" id="it-doc" accept=".pdf,.doc,.docx"></label>
@@ -211,18 +322,54 @@ function bind(){
   root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ activeTab=b.dataset.tab; editing=null; confirming=null; try{localStorage.setItem('ramses-tab',activeTab)}catch(e){} render(); });
   root.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>act(b.dataset.act,b.dataset));
   root.querySelectorAll('form[data-form]').forEach(f=>f.onsubmit=e=>{ e.preventDefault(); submit(f); });
+  root.querySelectorAll('select[data-member]').forEach(s=>s.onchange=async()=>{
+    const {error}=await sb.from('members').update({graad:Number(s.value)}).eq('email',s.dataset.member);
+    if(error){ toast('Opslaan is niet gelukt.'); return loadMembers(); }
+    const m=members.find(x=>x.email===s.dataset.member); if(m) m.graad=Number(s.value);
+    toast(`${s.dataset.member}: ${s.value}e graad (${GRADEN[s.value]})`);
+  });
+  if(owner){
+    const dz=root.querySelector('#drop-zone');
+    if(dz){
+      dz.ondragover=e=>{ e.preventDefault(); dz.classList.add('over'); };
+      dz.ondragleave=()=>dz.classList.remove('over');
+      dz.ondrop=e=>{ e.preventDefault(); dz.classList.remove('over'); bulkUpload([...e.dataTransfer.files], activeTab, root.querySelector('#bulk-date').value); };
+      root.querySelector('#bulk-files').onchange=e=>bulkUpload([...e.target.files], activeTab, root.querySelector('#bulk-date').value);
+    }
+    const tf=root.querySelector('#tabdoc-file');
+    if(tf) tf.onchange=e=>setTabDoc(e.target.files[0]);
+    const td=root.querySelector('.tabdoc');
+    if(td){
+      td.ondragover=e=>{ e.preventDefault(); e.stopPropagation(); td.classList.add('over'); };
+      td.ondragleave=()=>td.classList.remove('over');
+      td.ondrop=e=>{ e.preventDefault(); e.stopPropagation(); td.classList.remove('over'); setTabDoc(e.dataTransfer.files[0]); };
+    }
+    // Slepen op een tabbladknop zet de bestanden in dat tabblad
+    root.querySelectorAll('[data-tab]').forEach(b=>{
+      b.ondragover=e=>{ e.preventDefault(); b.classList.add('over'); };
+      b.ondragleave=()=>b.classList.remove('over');
+      b.ondrop=e=>{ e.preventDefault(); b.classList.remove('over'); activeTab=b.dataset.tab; bulkUpload([...e.dataTransfer.files], b.dataset.tab, tabDate(b.dataset.tab)); };
+    });
+  }
   const first = root.querySelector('form input[type=text],form input[type=email]'); if(first && document.activeElement===document.body) first.focus();
 }
 
 async function act(a,d){
   const tab=currentTab();
-  if(a==='show-login'){ showLogin=true; loginError=''; return render(); }
-  if(a==='hide-login'){ showLogin=false; return render(); }
+  if(a==='login-again'){ loginSent=''; loginError=''; return render(); }
   if(a==='reload') return load();
   if(a==='logout'){ await sb.auth.signOut(); return; }
   if(!owner) return;
   confirming=null;
-  if(a==='new-tab') editing='new-tab';
+  if(a==='view-muziek'){ view='muziek'; editing=null; }
+  else if(a==='view-leden'){ view='leden'; editing=null; render(); return loadMembers(); }
+  else if(a==='ask-del-member') confirming='m:'+d.email;
+  else if(a==='del-member'){
+    const {error}=await sb.from('members').delete().eq('email',d.email);
+    if(error) return toast('Verwijderen is niet gelukt.');
+    toast('Verwijderd'); return loadMembers();
+  }
+  else if(a==='new-tab') editing='new-tab';
   else if(a==='rename-tab') editing='rename-tab';
   else if(a==='ask-del-tab'){ confirming='tab'; editing=null; }
   else if(a==='del-tab'){
@@ -231,6 +378,14 @@ async function act(a,d){
     if(error) return toast('Verwijderen is niet gelukt.');
     if(paths.length) sb.storage.from(BUCKET).remove(paths);
     activeTab=null; toast('Tabblad verwijderd'); return load();
+  }
+  else if(a==='ask-del-tabdoc') confirming='tabdoc';
+  else if(a==='del-tabdoc'){
+    const p=tab.doc_path;
+    const {error}=await sb.from('tabs').update({doc_path:null, doc_name:null}).eq('id',tab.id);
+    if(error) return toast('Weghalen is niet gelukt.');
+    if(p) sb.storage.from(BUCKET).remove([p]);
+    toast('Document weggehaald'); return load();
   }
   else if(a==='add-item') editing='new-item';
   else if(a==='edit-item') editing=d.id;
@@ -255,19 +410,70 @@ async function uploadFile(file){
   return path;
 }
 
+async function bulkUpload(files, tabId, date){
+  if(!owner || busy || !tabId) return;
+  files = files.filter(f=>AUDIO_EXT.includes(ext(f.name)) || DOC_EXT.includes(ext(f.name)));
+  if(!files.length){ toast('Geen muziek- of documentbestanden gevonden. Gebruik MP3, WAV, M4A, PDF of Word.'); return; }
+  const tooBig = files.filter(f=>f.size>50*1024*1024);
+  if(tooBig.length){ toast(`Overgeslagen (groter dan 50 MB): ${tooBig.map(f=>f.name).join(', ')}`); files = files.filter(f=>!tooBig.includes(f)); }
+  files.sort((a,b)=>a.name.localeCompare(b.name,'nl',{numeric:true}));
+  // Muziek en document met dezelfde naam horen bij elkaar
+  const audio = files.filter(f=>AUDIO_EXT.includes(ext(f.name)));
+  const docs = files.filter(f=>DOC_EXT.includes(ext(f.name)));
+  const groups = audio.map(a=>({title:prettyTitle(a.name), audio:a, doc:null}));
+  docs.forEach(d=>{
+    const g = groups.find(x=>!x.doc && x.audio && baseName(x.audio.name).toLowerCase()===baseName(d.name).toLowerCase());
+    if(g) g.doc=d; else groups.push({title:prettyTitle(d.name), audio:null, doc:d});
+  });
+  busy=true; let done=0, failed=[];
+  const total = groups.length;
+  for(const g of groups){
+    progress = `Bezig: ${done+1} van ${total} — ${g.title}`; render();
+    try{
+      const row = {tab_id:tabId, title:g.title, ritual_date: date||null};
+      if(g.audio){ row.audio_path=await uploadFile(g.audio); row.audio_name=g.audio.name; }
+      if(g.doc){ row.doc_path=await uploadFile(g.doc); row.doc_name=g.doc.name; }
+      const res = await sb.from('items').insert(row);
+      if(res.error) throw res.error;
+      done++;
+    }catch(err){ console.error(err); failed.push(g.title); }
+  }
+  busy=false; progress='';
+  await load();
+  toast(failed.length ? `${done} toegevoegd. Niet gelukt: ${failed.join(', ')}` : `${done} ${done===1?'nummer':'nummers'} toegevoegd`);
+}
+
 async function submit(f){
   const kind=f.dataset.form;
   if(kind==='login'){
-    const email=f.querySelector('#login-email').value.trim(), password=f.querySelector('#login-pass').value;
-    const {error}=await sb.auth.signInWithPassword({email,password});
-    if(error){ loginError='Inloggen mislukt. Controleer je e-mailadres en wachtwoord.'; render(); }
-    return;
+    const email=f.querySelector('#login-email').value.trim().toLowerCase(), graad=Number(f.querySelector('#login-graad').value);
+    loginError=''; busy=true; render();
+    const chk = await sb.rpc('check_member', {p_email: email, p_graad: graad});
+    if(chk.error || chk.data!=='ok'){
+      busy=false;
+      loginError = chk.error ? 'Er ging iets mis. Probeer het later opnieuw.'
+        : chk.data==='graad' ? 'Deze graad hoort niet bij dit e-mailadres. Kies je eigen graad.'
+        : 'Dit e-mailadres staat niet op de ledenlijst. Vraag de broeder van talent om je toe te voegen.';
+      return render();
+    }
+    const {error} = await sb.auth.signInWithOtp({email, options:{emailRedirectTo: location.origin + location.pathname, shouldCreateUser: true}});
+    busy=false;
+    if(error){ loginError = /rate|limit|seconds/i.test(error.message) ? 'Er is net al een link verstuurd. Wacht een minuut en probeer het opnieuw.' : 'De inloglink kon niet worden verstuurd. Probeer het later opnieuw.'; return render(); }
+    loginSent=email; return render();
+  }
+  if(kind==='member-add'){
+    const email=f.querySelector('#m-email').value.trim().toLowerCase(), graad=Number(f.querySelector('#m-graad').value);
+    if(!email) return;
+    const {error}=await sb.from('members').upsert({email, graad});
+    if(error) return toast('Toevoegen is niet gelukt. Controleer het e-mailadres.');
+    toast(`${email} toegevoegd als ${GRADEN[graad]}`); return loadMembers();
   }
   if(kind==='tab-new'||kind==='tab-rename'){
     const name=f.querySelector('#tab-name').value.trim(); if(!name) return;
+    const graad=Number(f.querySelector('#tab-graad').value)||1;
     let res;
-    if(kind==='tab-new') res = await sb.from('tabs').insert({name, position: tabs.length}).select().single();
-    else res = await sb.from('tabs').update({name}).eq('id',currentTab().id);
+    if(kind==='tab-new') res = await sb.from('tabs').insert({name, graad, position: tabs.length}).select().single();
+    else res = await sb.from('tabs').update({name, graad}).eq('id',currentTab().id);
     if(res.error) return toast('Opslaan is niet gelukt.');
     if(kind==='tab-new') activeTab=res.data.id;
     editing=null; toast(kind==='tab-new'?'Tabblad aangemaakt':'Naam opgeslagen'); return load();
@@ -297,13 +503,31 @@ async function submit(f){
   }
 }
 
-sb.auth.onAuthStateChange((_e, session)=>{
-  const was=owner; owner=!!session;
-  if(owner) showLogin=false;
-  if(!owner){ editing=null; confirming=null; }
-  if(was!==owner) render();
-});
-(async()=>{ const {data}=await sb.auth.getSession(); owner=!!(data&&data.session); await load(); })();
+// Voorkom dat de browser een bestand opent als het naast de sleepzone wordt losgelaten
+window.addEventListener('dragover', e=>e.preventDefault());
+window.addEventListener('drop', e=>e.preventDefault());
+
+// Inlogstatus bepalen: wie is dit en welke graad?
+let applying = null;
+async function applySession(s){
+  const key = s ? s.user.id : '';
+  if(applying===key) return; applying=key;
+  session = s || null; role = null; owner = false; editing=null; confirming=null;
+  if(session){
+    const r = await sb.rpc('whoami');
+    role = r.error ? null : r.data;
+    owner = !!(role && role.admin);
+    if(role && (role.admin || role.graad)) await load();
+  }
+  ready = true; render();
+}
+sb.auth.onAuthStateChange((_e, s)=>{ setTimeout(()=>applySession(s), 0); });
+(async()=>{
+  const {data}=await sb.auth.getSession();
+  await applySession(data && data.session);
+  // Na het klikken op de inloglink de lange code uit de adresbalk halen
+  if(/access_token|error_description/.test(location.hash)) history.replaceState(null,'',location.pathname);
+})();
 </script>
 </body>
 </html>
