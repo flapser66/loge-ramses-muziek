@@ -163,9 +163,12 @@ function footer(){
 }
 
 function loginScreen(){
-  if(loginSent) return `<div class="login" style="margin-top:24px"><h2>Kijk in je mail</h2>
-    <p class="sub">We hebben een inloglink gestuurd naar <strong>${esc(loginSent)}</strong>. Klik op de link in die mail om binnen te komen. Zie je niets? Kijk ook in je map met ongewenste mail.</p>
-    <div class="row"><button type="button" data-act="login-again">Ander e-mailadres</button></div></div>`;
+  if(loginSent) return `<form class="login" data-form="code" style="margin-top:24px"><h2>Kijk in je mail</h2>
+    <p class="sub">We hebben een mail gestuurd naar <strong>${esc(loginSent)}</strong>. Typ hieronder de code uit die mail. Dan blijft dit apparaat onthouden en hoef je niet opnieuw in te loggen.</p>
+    <label>Code uit de mail<input type="text" id="login-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required placeholder="123456"></label>
+    ${loginError?`<p class="err">${esc(loginError)}</p>`:''}
+    <div class="row"><button class="primary" type="submit" ${busy?'disabled':''}>${busy?'Controleren…':'Inloggen'}</button><button type="button" data-act="login-again">Ander e-mailadres</button></div>
+    <span class="hint">Zie je geen mail? Kijk ook bij ongewenste mail. Klikken op de link in de mail werkt ook, maar alleen als die opent in de browser waarin je de app gebruikt.</span></form>`;
   return `<form class="login" data-form="login" style="margin-top:24px"><h2>Inloggen</h2>
     <p class="sub">Vul je e-mailadres in en kies je graad. Je krijgt een inloglink per mail.</p>
     <label>E-mailadres<input type="email" id="login-email" required autocomplete="email"></label>
@@ -460,6 +463,15 @@ async function submit(f){
     busy=false;
     if(error){ loginError = /rate|limit|seconds/i.test(error.message) ? 'Er is net al een link verstuurd. Wacht een minuut en probeer het opnieuw.' : 'De inloglink kon niet worden verstuurd. Probeer het later opnieuw.'; return render(); }
     loginSent=email; return render();
+  }
+  if(kind==='code'){
+    const token=f.querySelector('#login-code').value.replace(/\s+/g,'');
+    if(!token) return;
+    loginError=''; busy=true; render();
+    const {error}=await sb.auth.verifyOtp({email: loginSent, token, type:'email'});
+    busy=false;
+    if(error){ loginError='Deze code klopt niet of is verlopen. Controleer de code of vraag een nieuwe aan.'; return render(); }
+    loginSent=''; return; // de inlogstatus wordt automatisch bijgewerkt
   }
   if(kind==='member-add'){
     const email=f.querySelector('#m-email').value.trim().toLowerCase(), graad=Number(f.querySelector('#m-graad').value);
