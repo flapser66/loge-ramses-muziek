@@ -80,6 +80,16 @@ input[type=email],input[type=password]{font:inherit;font-size:15px;padding:8px 1
 .err{color:var(--danger);font-size:14px;margin:0}
 .progress{font-family:var(--mono);font-size:13px;color:var(--gold)}
 footer button.link{font-size:13px}
+.moment{display:flex;flex-direction:column;gap:2px}
+.moment-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+.downloads{display:flex;flex-wrap:wrap;gap:10px}
+a.dl{display:inline-flex;align-items:center;gap:10px;box-sizing:border-box;min-height:52px;line-height:1.2;padding:12px 22px;border-radius:8px;background:var(--blue);color:var(--bg);font-size:16px;font-weight:600;text-decoration:none;border:1px solid var(--blue)}
+a.dl:hover{filter:brightness(1.08)}
+a.dl:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@media (max-width:520px){.downloads{flex-direction:column}a.dl{justify-content:center;width:100%;box-sizing:border-box}}
+.tabdoc-file{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.tabdoc-name{font-size:15px;min-width:0;overflow-wrap:anywhere}
+
 .brand{display:flex;align-items:center;gap:16px}
 .brand-text{display:flex;flex-direction:column;gap:4px;min-width:0}
 .logo{width:84px;height:84px;border-radius:6px;flex:none;box-shadow:0 1px 3px rgba(0,0,0,.25)}
@@ -270,12 +280,9 @@ function render(){
   list.forEach(it=>{
     if(owner && editing===it.id){ h += `<li class="item">${itemForm(it)}</li>`; return; }
     h += `<li class="item"><div class="item-head"><h3>${esc(it.title)}</h3>${it.ritual_date?`<span class="date">${esc(fmtDate(it.ritual_date))}</span>`:''}</div>`;
-    if(it.note) h += `<p class="note">${esc(it.note)}</p>`;
+    if(it.note) h += `<div class="moment"><span class="moment-label">Moment in de tempel</span><p class="note">${esc(it.note)}</p></div>`;
     if(it.audio_path) h += `<audio controls preload="none" src="${esc(publicUrl(it.audio_path))}"></audio>`;
-    h += `<div class="files">`;
-    if(it.audio_path) h += fileLink(it.audio_path, it.audio_name, 'Muziek');
-    if(it.doc_path) h += fileLink(it.doc_path, it.doc_name, ext(it.doc_name)==='pdf'?'PDF':'Word');
-    h += `</div>`;
+    if(it.audio_path) h += `<div class="downloads">${dlButton(it.audio_path, it.audio_name, 'Download muziek')}</div>`;
     if(owner){
       if(confirming===it.id) h += `<div class="confirm">“${esc(it.title)}” verwijderen? <button class="danger" data-act="del-item" data-id="${it.id}">Verwijderen</button><button data-act="cancel">Annuleren</button></div>`;
       else h += `<div class="row"><button class="link" data-act="edit-item" data-id="${it.id}">Bewerken</button><button class="link" data-act="ask-del-item" data-id="${it.id}">Verwijderen</button></div>`;
@@ -286,6 +293,10 @@ function render(){
   root.innerHTML = h + footer();
   bind();
 }
+// Grote downloadknop; de bestandsnaam staat alleen in de tooltip
+function dlButton(path,name,label){
+  return `<a class="dl" href="${esc(publicUrl(path,name))}" download="${esc(name)}" title="${esc(name)}"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${esc(label)}</span></a>`;
+}
 function fileLink(path,name,kind){
   return `<a class="btn file" href="${esc(publicUrl(path,name))}" download="${esc(name)}" title="Download ${esc(name)}"><span class="kind">${kind}</span><span class="name">${esc(name)}</span><span aria-hidden="true">↓</span></a>`;
 }
@@ -294,7 +305,7 @@ function tabDocBlock(tab){
   if(!tab.doc_path && !owner) return '';
   let h = `<div class="tabdoc"><div class="tabdoc-head"><span class="eyebrow">Document bij dit tabblad</span></div>`;
   if(tab.doc_path){
-    h += `<div class="files">${fileLink(tab.doc_path, tab.doc_name, ext(tab.doc_name)==='pdf'?'PDF':'Word')}</div>`;
+    h += `<div class="tabdoc-file"><span class="tabdoc-name">${esc(tab.doc_name)}</span>${dlButton(tab.doc_path, tab.doc_name, 'Download')}</div>`;
     if(owner){
       if(confirming==='tabdoc') h += `<div class="confirm">“${esc(tab.doc_name)}” weghalen? <button class="danger" data-act="del-tabdoc">Weghalen</button><button data-act="cancel">Annuleren</button></div>`;
       else h += `<div class="row"><label class="btn link-like">Vervangen<input type="file" id="tabdoc-file" accept=".pdf,.doc,.docx" hidden></label><button class="link" data-act="ask-del-tabdoc">Weghalen</button></div>`;
@@ -340,7 +351,7 @@ function itemForm(it){
   return `<form class="edit" data-form="item" data-id="${it?it.id:''}">
   <div class="grid2"><label>Titel van het nummer<input type="text" id="it-title" required maxlength="140" value="${esc(it?it.title:'')}" placeholder="bijv. Air – J.S. Bach"></label>
   <label>Datum ritueel<input type="date" id="it-date" value="${esc(it?it.ritual_date||'':tabDate(activeTab))}"></label></div>
-  <label>Toelichting (optioneel)<textarea id="it-note" rows="2" maxlength="600" placeholder="bijv. gespeeld bij de opening">${esc(it?it.note||'':'')}</textarea></label>
+  <label>Moment in de tempel (optioneel)<textarea id="it-note" rows="2" maxlength="600" placeholder="bijv. gespeeld tijdens de opening van de loge">${esc(it?it.note||'':'')}</textarea></label>
   <label>Muziekbestand${it&&it.audio_name?` <span class="hint">huidig: ${esc(it.audio_name)}</span>`:''}<input type="file" id="it-audio" accept="audio/*,.mp3,.m4a,.wav,.ogg"></label>
   <label>Document (Word of PDF)${it&&it.doc_name?` <span class="hint">huidig: ${esc(it.doc_name)}</span>`:''}<input type="file" id="it-doc" accept=".pdf,.doc,.docx"></label>
   <span class="hint">Maximaal 50 MB per bestand.</span>
@@ -543,6 +554,11 @@ async function submit(f){
 }
 
 // Voorkom dat de browser een bestand opent als het naast de sleepzone wordt losgelaten
+// Maar één nummer tegelijk: start er een, dan stoppen de andere
+document.addEventListener('play', e=>{
+  if(e.target.tagName!=='AUDIO') return;
+  document.querySelectorAll('audio').forEach(a=>{ if(a!==e.target && !a.paused) a.pause(); });
+}, true);
 window.addEventListener('dragover', e=>e.preventDefault());
 window.addEventListener('drop', e=>e.preventDefault());
 
