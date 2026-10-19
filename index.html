@@ -189,6 +189,7 @@ let tabs = [], items = [], owner = false;
 let activeTab = null, editing = null, confirming = null, busy = false, progress = '', loginError = '', loadError = '';
 let session = null, role = null, view = 'muziek', members = [], loginSent = '', ready = false;
 const GRADEN = {1:'Leerling', 2:'Gezel', 3:'Meester'};
+const MAX_ACTIEF = 3; // aantal actuele lijsten in de tabbalk
 const graadSelect = (id, val) => `<select id="${id}">${[1,2,3].map(g=>`<option value="${g}" ${Number(val)===g?'selected':''}>${g} · ${GRADEN[g]}</option>`).join('')}</select>`;
 try{ activeTab = (location.hash||'').slice(1) || localStorage.getItem('ramses-tab'); }catch(e){}
 const root = document.getElementById('root');
@@ -212,7 +213,7 @@ const prettyTitle = n => baseName(n).replace(/[_]+/g,' ').replace(/\s+/g,' ').tr
 
 async function load(){
   const [t,i] = await Promise.all([
-    sb.from('tabs').select('*').order('position').order('created_at'),
+    sb.from('tabs').select('*').order('created_at',{ascending:false}),
     sb.from('items').select('*')
   ]);
   if(t.error||i.error){ loadError='De gegevens konden niet worden geladen. Controleer de internetverbinding of de instellingen bovenaan het bestand.'; }
@@ -681,7 +682,12 @@ async function submit(f){
     if(kind==='tab-new') res = await sb.from('tabs').insert({name, graad, position: tabs.length}).select().single();
     else res = await sb.from('tabs').update({name, graad}).eq('id',currentTab().id);
     if(res.error) return toast('Opslaan is niet gelukt.');
-    if(kind==='tab-new') activeTab=res.data.id;
+    if(kind==='tab-new'){
+      activeTab=res.data.id;
+      // Maximaal MAX_ACTIEF actuele lijsten: de oudste gaan automatisch naar het archief
+      const old = tabs.filter(t=>!t.archived).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).slice(MAX_ACTIEF-1);
+      if(old.length){ await sb.from('tabs').update({archived:true}).in('id', old.map(t=>t.id)); toast(`“${name}” aangemaakt. Naar het archief: ${old.map(t=>t.name).join(', ')}`); editing=null; return load(); }
+    }
     editing=null; toast(kind==='tab-new'?'Tabblad aangemaakt':'Naam opgeslagen'); return load();
   }
   if(kind==='item'){
