@@ -80,6 +80,18 @@ input[type=email],input[type=password]{font:inherit;font-size:15px;padding:8px 1
 .err{color:var(--danger);font-size:14px;margin:0}
 .progress{font-family:var(--mono);font-size:13px;color:var(--gold)}
 footer button.link{font-size:13px}
+.atable-wrap{overflow-x:auto}
+.atable{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.atable th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--line)}
+.atable td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.atable tr.sel td{background:var(--gold-soft)}
+.alog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.alog li{display:grid;grid-template-columns:150px minmax(0,220px) minmax(0,1fr);gap:4px 12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.atime{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.awho{overflow-wrap:anywhere}.awhat{min-width:0;overflow-wrap:anywhere}
+.abadge{display:inline-block;font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;margin-right:4px;background:var(--gold-soft);color:var(--gold)}
+.a-afspelen{background:rgba(143,168,255,.18);color:var(--blue)}.a-download{background:rgba(120,200,140,.18);color:#4c9a63}
+@media (max-width:640px){.alog li{grid-template-columns:1fr}}
 .moment{display:flex;flex-direction:column;gap:2px}
 .moment-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
 .downloads{display:flex;flex-wrap:wrap;gap:10px}
@@ -189,7 +201,7 @@ function header(){
   if(role && owner) mode = `<span class="mode owner">Beheer — jij kunt wijzigen</span>`;
   else if(role && role.graad) mode = `<span class="mode">${role.graad}e graad · ${GRADEN[role.graad]} — bekijken en downloaden</span>`;
   let nav = '';
-  if(owner) nav = `<div class="row viewnav"><button class="${view==='muziek'?'primary':''}" data-act="view-muziek">Muziek</button><button class="${view==='leden'?'primary':''}" data-act="view-leden">Leden</button></div>`;
+  if(owner) nav = `<div class="row viewnav"><button class="${view==='muziek'?'primary':''}" data-act="view-muziek">Muziek</button><button class="${view==='leden'?'primary':''}" data-act="view-leden">Leden</button><button class="${view==='activiteit'?'primary':''}" data-act="view-activiteit">Activiteit</button></div>`;
   return `<header class="top"><div class="brand"><img class="logo" src="${LOGO}" alt="Logo Loge Ramses" width="84" height="84"><div class="brand-text"><span class="eyebrow">Loge Ramses · Velp</span><h1>Ritueelmuziek</h1>
   <p class="sub">Muziek die tijdens de rituelen is gespeeld, met het bijbehorende document.</p></div></div>
   <div class="zbox"><canvas id="zodiac" aria-hidden="true"></canvas><div class="ztext" aria-live="off"><span class="zlabel">De symbolen van de vrijmetselarij</span><strong id="ztool-name"></strong><p id="ztool-text"></p></div></div>
@@ -208,6 +220,7 @@ function loginScreen(){
     <span class="hint">Zie je geen mail? Kijk ook bij ongewenste mail. Klikken op de link in de mail werkt ook, maar alleen als die opent in de browser waarin je de app gebruikt.</span></form>`;
   return `<form class="login" data-form="login" style="margin-top:24px"><h2>Inloggen</h2>
     <p class="sub">Vul je e-mailadres in en kies je graad. Je krijgt een inloglink per mail.</p>
+    <span class="hint">Wanneer je inlogt en wat je afspeelt of downloadt, wordt bijgehouden voor de beheerder.</span>
     <label>E-mailadres<input type="email" id="login-email" required autocomplete="email"></label>
     <label>Graad${graadSelect('login-graad',1)}</label>
     ${loginError?`<p class="err">${esc(loginError)}</p>`:''}
@@ -230,6 +243,48 @@ function membersView(){
   });
   return h + `</div></section>`;
 }
+// ===== Activiteit (alleen beheer) =====
+let activity = [], actFilter = '', actLoaded = false;
+const ACT_LABEL = {bezoek:'Online', tabblad:'Tabblad geopend', afspelen:'Afgespeeld', download:'Gedownload'};
+const fmtTime = d => new Date(d).toLocaleString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+async function loadActivity(){
+  const [a, m] = await Promise.all([
+    sb.from('activity').select('*').order('created_at',{ascending:false}).limit(1000),
+    sb.from('members').select('*').order('email')
+  ]);
+  if(a.error){ toast('Activiteit kon niet worden geladen.'); return; }
+  activity = a.data; if(!m.error) members = m.data; actLoaded = true; render();
+}
+function activityView(){
+  let h = `<section class="panel" style="border-radius:8px"><div class="panel-head"><h2>Activiteit</h2><button class="link" data-act="view-activiteit">Vernieuwen</button></div>`;
+  if(!actLoaded) return h + `<p class="sub">Laden…</p></section>`;
+  // Overzicht per lid
+  const per = {};
+  members.forEach(m=>per[m.email]={email:m.email, graad:m.graad, last:null, play:0, dl:0});
+  activity.forEach(r=>{ const p = per[r.email] || (per[r.email]={email:r.email, graad:null, last:null, play:0, dl:0});
+    if(!p.last || r.created_at > p.last) p.last = r.created_at;
+    if(r.action==='afspelen') p.play++; if(r.action==='download') p.dl++; });
+  const rows = Object.values(per).sort((a,b)=>(b.last||'').localeCompare(a.last||''));
+  h += `<p class="sub">Laatst online per broeder of zuster, en hoe vaak er is afgespeeld en gedownload.</p><div class="atable-wrap"><table class="atable"><thead><tr><th>E-mailadres</th><th>Graad</th><th>Laatst online</th><th>Afgespeeld</th><th>Downloads</th></tr></thead><tbody>`;
+  rows.forEach(p=>{ h += `<tr class="${actFilter===p.email?'sel':''}"><td><button class="link" data-act="act-filter" data-email="${esc(p.email)}">${esc(p.email)}</button></td><td>${p.graad||'–'}</td><td>${p.last?esc(fmtTime(p.last)):'<span class="hint">nog nooit</span>'}</td><td>${p.play}</td><td>${p.dl}</td></tr>`; });
+  h += `</tbody></table></div>`;
+  // Tijdlijn
+  const list = activity.filter(r=>!actFilter || r.email===actFilter).slice(0,200);
+  h += `<div class="panel-head" style="margin-top:8px"><h2 style="font-size:17px">${actFilter?`Activiteit van ${esc(actFilter)}`:'Laatste activiteit'}</h2>${actFilter?'<button class="link" data-act="act-filter" data-email="">Iedereen tonen</button>':''}</div>`;
+  if(!list.length) h += `<div class="empty"><strong>Nog geen activiteit</strong><span>Zodra iemand inlogt, iets afspeelt of downloadt, verschijnt het hier.</span></div>`;
+  else { h += `<ul class="alog">`; list.forEach(r=>{ h += `<li><span class="atime">${esc(fmtTime(r.created_at))}</span><span class="awho">${esc(r.email)}</span><span class="awhat"><span class="abadge a-${r.action}">${ACT_LABEL[r.action]||r.action}</span> ${esc(r.detail||'')}</span></li>`; }); h += `</ul>`; }
+  return h + `</section>`;
+}
+// Activiteit vastleggen (niet voor beheer); elk ding één keer per bezoek
+const logged = new Set();
+function logAct(action, detail){
+  if(!session || !role || owner) return;
+  const key = action+'|'+(detail||''); if(action!=='download' && logged.has(key)) return; logged.add(key);
+  sb.from('activity').insert({action, detail: detail ? String(detail).slice(0,300) : null}).then(()=>{}, ()=>{});
+}
+const itemTitleOf = el => { const li = el.closest('li.item'); if(li){ const h3 = li.querySelector('h3'); return h3 ? h3.textContent : ''; } const t = currentTab(); return t ? 'Document bij ' + t.name : ''; };
+document.addEventListener('click', e=>{ const a = e.target.closest('a.dl'); if(a) logAct('download', itemTitleOf(a) + (a.title ? ' ('+a.title+')' : '')); }, true);
+
 async function loadMembers(){
   const r = await sb.from('members').select('*').order('graad').order('email');
   if(r.error){ toast('Ledenlijst kon niet worden geladen.'); return; }
@@ -244,6 +299,7 @@ function render(){
     root.innerHTML = h + `<div class="empty"><strong>Geen toegang</strong><span>Het e-mailadres ${esc(session.user.email)} staat niet op de ledenlijst. Neem contact op met de broeder van talent.</span></div>` + footer(); bind(); return;
   }
   if(owner && view==='leden'){ root.innerHTML = h + membersView() + footer(); bind(); return; }
+  if(owner && view==='activiteit'){ root.innerHTML = h + activityView() + footer(); bind(); return; }
   if(loadError){ root.innerHTML = h + `<div class="empty"><strong>Niet geladen</strong><span>${esc(loadError)}</span><button data-act="reload">Opnieuw proberen</button></div>` + footer(); bind(); return; }
 
   const tab = currentTab();
@@ -260,6 +316,7 @@ function render(){
   }
 
   const list = itemsOf(tab.id);
+  logAct('tabblad', tab.name);
   h += `<section class="panel" role="tabpanel"><div class="panel-head">`;
   if(owner && editing==='rename-tab') h += tabNameForm('rename', tab.name);
   else {
@@ -404,6 +461,8 @@ async function act(a,d){
   confirming=null;
   if(a==='view-muziek'){ view='muziek'; editing=null; }
   else if(a==='view-leden'){ view='leden'; editing=null; render(); return loadMembers(); }
+  else if(a==='view-activiteit'){ view='activiteit'; editing=null; render(); return loadActivity(); }
+  else if(a==='act-filter'){ actFilter=d.email||''; }
   else if(a==='ask-del-member') confirming='m:'+d.email;
   else if(a==='del-member'){
     const {error}=await sb.from('members').delete().eq('email',d.email);
@@ -558,6 +617,7 @@ async function submit(f){
 document.addEventListener('play', e=>{
   if(e.target.tagName!=='AUDIO') return;
   document.querySelectorAll('audio').forEach(a=>{ if(a!==e.target && !a.paused) a.pause(); });
+  logAct('afspelen', itemTitleOf(e.target));
 }, true);
 window.addEventListener('dragover', e=>e.preventDefault());
 window.addEventListener('drop', e=>e.preventDefault());
@@ -572,7 +632,7 @@ async function applySession(s){
     const r = await sb.rpc('whoami');
     role = r.error ? null : r.data;
     owner = !!(role && role.admin);
-    if(role && (role.admin || role.graad)) await load();
+    if(role && (role.admin || role.graad)){ await load(); logAct('bezoek', null); }
   }
   ready = true; render();
 }
