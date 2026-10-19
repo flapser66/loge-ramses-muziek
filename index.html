@@ -80,6 +80,22 @@ input[type=email],input[type=password]{font:inherit;font-size:15px;padding:8px 1
 .err{color:var(--danger);font-size:14px;margin:0}
 .progress{font-family:var(--mono);font-size:13px;color:var(--gold)}
 footer button.link{font-size:13px}
+.tab-archive .gbadge{margin-left:6px}
+.asearch{display:flex;flex-direction:column;gap:4px;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.asearch input{font:inherit;font-family:var(--body);font-size:16px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);max-width:420px;box-sizing:border-box;width:100%}
+details.ayear{border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+details.ayear summary{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;font-family:var(--display);font-size:18px;letter-spacing:.05em;list-style:none}
+details.ayear summary::-webkit-details-marker{display:none}
+details.ayear summary::before{content:'▸';color:var(--gold);margin-right:8px;transition:transform .15s}
+details.ayear[open] summary::before{transform:rotate(90deg)}
+details.ayear summary span:first-child{flex:1}
+ul.alist{list-style:none;margin:0;padding:0 8px 8px;display:flex;flex-direction:column;gap:6px}
+button.aopen{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:12px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface)}
+button.aopen:hover{border-color:var(--gold)}
+.aname{font-size:16px;font-weight:600}
+.ameta{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ahits{font-size:13px;color:var(--gold)}
+.archback{justify-content:space-between}
 .tab-news{color:var(--gold)}
 .nhead{font-family:var(--display);font-weight:500;letter-spacing:.05em;font-size:17px;margin:6px 0 0;color:var(--ink)}
 ul.news{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
@@ -182,7 +198,7 @@ const ext = n => (String(n).split('.').pop()||'').toLowerCase();
 const publicUrl = (path, downloadName) => sb.storage.from(BUCKET).getPublicUrl(path, downloadName ? {download: downloadName} : undefined).data.publicUrl;
 
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; t.setAttribute('role','status'); document.body.appendChild(t); setTimeout(()=>t.remove(),4000); }
-function currentTab(){ let t=tabs.find(x=>x.id===activeTab); if(!t){ t=tabs[0]||null; activeTab=t?t.id:null; } return t; }
+function currentTab(){ let t=tabs.find(x=>x.id===activeTab); if(!t){ t=tabs.find(x=>!x.archived)||null; activeTab=t?t.id:null; } return t; }
 const itemsOf = tabId => items.filter(i=>i.tab_id===tabId).sort((a,b)=>(b.ritual_date||'').localeCompare(a.ritual_date||'') || (a.created_at||'').localeCompare(b.created_at||''));
 // Datum van het eerste nummer dat in dit tabblad is gezet
 function tabDate(tabId){
@@ -293,6 +309,40 @@ function logAct(action, detail){
 const itemTitleOf = el => { const li = el.closest('li.item'); if(li){ const h3 = li.querySelector('h3'); return h3 ? h3.textContent : ''; } const t = currentTab(); return t ? 'Document bij ' + t.name : ''; };
 document.addEventListener('click', e=>{ const a = e.target.closest('a.dl'); if(a) logAct('download', itemTitleOf(a) + (a.title ? ' ('+a.title+')' : '')); }, true);
 
+// ===== Archief =====
+let archQuery = '';
+const tabYear = t => { const d = items.filter(i=>i.tab_id===t.id && i.ritual_date).map(i=>i.ritual_date).sort()[0] || (t.created_at||'').slice(0,10); return d ? d.slice(0,4) : 'Onbekend'; };
+const tabFirstDate = t => items.filter(i=>i.tab_id===t.id && i.ritual_date).map(i=>i.ritual_date).sort()[0] || '';
+function archiveList(){
+  const q = archQuery.trim().toLowerCase();
+  const arch = tabs.filter(t=>t.archived);
+  const match = t => !q || t.name.toLowerCase().includes(q) || items.some(i=>i.tab_id===t.id && (i.title||'').toLowerCase().includes(q));
+  const found = arch.filter(match);
+  if(!found.length) return `<div class="empty"><strong>${q?'Niets gevonden':'Het archief is leeg'}</strong><span>${q?'Probeer een ander woord, bijvoorbeeld de naam van een nummer.':'Oude muzieklijsten verschijnen hier zodra de broeder van talent ze archiveert.'}</span></div>`;
+  const byYear = {};
+  found.forEach(t=>{ (byYear[tabYear(t)] = byYear[tabYear(t)] || []).push(t); });
+  const years = Object.keys(byYear).sort().reverse();
+  return years.map((y,i)=>{
+    const list = byYear[y].sort((a,b)=>(tabFirstDate(b)).localeCompare(tabFirstDate(a)));
+    return `<details class="ayear" ${i===0 || q ? 'open' : ''}><summary><span>${esc(y)}</span><span class="hint">${list.length} ${list.length===1?'lijst':'lijsten'}</span></summary><ul class="alist">${
+      list.map(t=>{ const n = items.filter(i=>i.tab_id===t.id).length, d = tabFirstDate(t);
+        const hits = q ? items.filter(i=>i.tab_id===t.id && (i.title||'').toLowerCase().includes(q)).map(i=>i.title) : [];
+        return `<li><button class="aopen" data-tab="${t.id}"><span class="aname">${esc(t.name)}</span><span class="ameta">${d?esc(fmtDate(d))+' · ':''}${n} ${n===1?'nummer':'nummers'}</span>${hits.length?`<span class="ahits">Bevat: ${esc(hits.slice(0,3).join(', '))}${hits.length>3?' …':''}</span>`:''}</button></li>`; }).join('')
+    }</ul></details>`;
+  }).join('');
+}
+function archiveView(){
+  return `<section class="panel" role="tabpanel"><div class="panel-head"><h2>Archief</h2></div>
+  <p class="sub">Eerdere muzieklijsten, per jaar. Klik op een jaar om het uit te klappen en op een lijst om die te openen.</p>
+  <label class="asearch">Zoeken in het archief<input type="search" id="arch-q" value="${esc(archQuery)}" placeholder="Naam van een lijst of nummer"></label>
+  <div id="arch-list">${archiveList()}</div></section>`;
+}
+function bindArchive(){
+  const inp = root.querySelector('#arch-q'); if(!inp) return;
+  inp.oninput = () => { archQuery = inp.value; const box = root.querySelector('#arch-list'); box.innerHTML = archiveList();
+    box.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ activeTab=b.dataset.tab; view='muziek'; editing=null; confirming=null; render(); window.scrollTo(0,0); }); };
+}
+
 // ===== Maçonniek nieuws =====
 let news = null, newsErr = '', newsLoading = false;
 async function loadNews(force){
@@ -337,11 +387,14 @@ function render(){
 
   const tab = currentTab();
   h += `<nav class="tabs" role="tablist">`;
-  tabs.forEach(t=>{ h+=`<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${view!=='nieuws'&&!!tab&&t.id===tab.id}">${esc(t.name)}${owner?` <span class="gbadge" title="${GRADEN[t.graad||1]}">${t.graad||1}</span>`:''}</button>`; });
+  tabs.filter(t=>!t.archived).forEach(t=>{ h+=`<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${view==='muziek'&&!!tab&&t.id===tab.id}">${esc(t.name)}${owner?` <span class="gbadge" title="${GRADEN[t.graad||1]}">${t.graad||1}</span>`:''}</button>`; });
+  const nArch = tabs.filter(t=>t.archived).length;
+  if(nArch) h+=`<button class="tab tab-archive" role="tab" data-act="view-archief" aria-selected="${view==='archief' || (view==='muziek' && !!tab && !!tab.archived)}">Archief <span class="gbadge">${nArch}</span></button>`;
   h+=`<button class="tab tab-news" role="tab" data-act="view-nieuws" aria-selected="${view==='nieuws'}">Maçonniek nieuws</button>`;
   if(owner) h+=`<button class="tab add" data-act="new-tab">+ Tabblad</button>`;
   h += `</nav>`;
   if(view==='nieuws'){ root.innerHTML = h + newsView() + footer(); bind(); return; }
+  if(view==='archief'){ root.innerHTML = h + archiveView() + footer(); bind(); bindArchive(); return; }
 
   if(!tab){
     h += `<section class="panel" style="border-radius:8px"><div class="empty">${ owner
@@ -352,11 +405,11 @@ function render(){
 
   const list = itemsOf(tab.id);
   logAct('tabblad', tab.name);
-  h += `<section class="panel" role="tabpanel"><div class="panel-head">`;
+  h += `<section class="panel" role="tabpanel">${tab.archived ? `<div class="row archback"><button class="link" data-act="view-archief">← Terug naar het archief</button><span class="abadge">Archief</span></div>` : ''}<div class="panel-head">`;
   if(owner && editing==='rename-tab') h += tabNameForm('rename', tab.name);
   else {
     h += `<h2>${esc(tab.name)}${owner?` <span class="hint">· zichtbaar vanaf ${tab.graad||1}e graad (${GRADEN[tab.graad||1]})</span>`:''}</h2>`;
-    if(owner) h += `<div class="row"><button class="link" data-act="rename-tab">Naam wijzigen</button><button class="link" data-act="ask-del-tab">Tabblad verwijderen</button><button class="primary" data-act="add-item">+ Muziek toevoegen</button></div>`;
+    if(owner) h += `<div class="row"><button class="link" data-act="rename-tab">Naam wijzigen</button>${tab.archived ? '<button class="link" data-act="unarchive-tab">Uit archief halen</button>' : '<button class="link" data-act="archive-tab">Naar archief</button>'}<button class="link" data-act="ask-del-tab">Tabblad verwijderen</button><button class="primary" data-act="add-item">+ Muziek toevoegen</button></div>`;
   }
   h += `</div>`;
   h += tabDocBlock(tab);
@@ -491,6 +544,7 @@ async function act(a,d){
   const tab=currentTab();
   if(a==='login-again'){ loginSent=''; loginError=''; return render(); }
   if(a==='reload') return load();
+  if(a==='view-archief'){ view='archief'; editing=null; confirming=null; return render(); }
   if(a==='view-nieuws'){ view='nieuws'; editing=null; render(); return loadNews(); }
   if(a==='news-refresh'){ return loadNews(true); }
   if(a==='logout'){ await sb.auth.signOut(); return; }
@@ -515,6 +569,12 @@ async function act(a,d){
     if(error) return toast('Verwijderen is niet gelukt.');
     if(paths.length) sb.storage.from(BUCKET).remove(paths);
     activeTab=null; toast('Tabblad verwijderd'); return load();
+  }
+  else if(a==='archive-tab' || a==='unarchive-tab'){
+    const arch = a==='archive-tab';
+    const {error}=await sb.from('tabs').update({archived: arch}).eq('id',tab.id);
+    if(error) return toast('Opslaan is niet gelukt.');
+    if(arch){ activeTab=null; } toast(arch ? `“${tab.name}” staat nu in het archief` : `“${tab.name}” staat weer bij de actuele tabbladen`); return load();
   }
   else if(a==='ask-del-tabdoc') confirming='tabdoc';
   else if(a==='del-tabdoc'){
